@@ -1,0 +1,51 @@
+# --- UNITY AUTO-GENERATED DIRECTORIES ---
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# --- VISUAL STUDIO / RIDER FILES ---
+.vs/
+.idea/
+.vscode/
+ExportedObj/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# --- CRASH REPORTS & OS JUNK ---
+sysinfo.txt
+.DS_Store
+Thumbs.db
+
+# --- BUILDS & PACKAGES ---
+*.apk
+*.aab
+*.unitypackage
+*.app
+*.exe
+*.dll
+*.so
+*.ipa
+*.xapk
+
+# --- YOUR HEAVY ASSETS (Ignore until Git LFS is set up) ---
+*.onnx
+# *.mp3  (Remove the '#' if you want to ignore audio files too)
+# *.wav  (Remove the '#' if you want to ignore audio files too)
