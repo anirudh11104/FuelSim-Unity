@@ -54,13 +54,13 @@ public class BikeEngineSimulator : MonoBehaviour
     public float brakePower = 200f;         // REDUCED: Stops the instant lock-up jumping
     public float currentBrakeForce = 0f;
 
-    // ================= TORQUE =================
+    // ================= TORQUE (ROYAL ENFIELD TUNE) =================
     public AnimationCurve torqueCurve = new AnimationCurve(
-        new Keyframe(0f, 0.2f),
-        new Keyframe(0.3f, 0.6f),
-        new Keyframe(0.5f, 1f),
-        new Keyframe(0.75f, 1.2f),
-        new Keyframe(1f, 0.5f)
+        new Keyframe(0.0f, 0.5f),  // Idle RPM: Already producing 50% torque! (The Thumper Grunt)
+        new Keyframe(0.2f, 0.8f),  // Low RPM: 80% torque (Pulls hard off the line)
+        new Keyframe(0.5f, 1.0f),  // Mid RPM: 100% Peak Torque 
+        new Keyframe(0.8f, 0.85f), // High RPM: Power starts dropping off
+        new Keyframe(1.0f, 0.4f)   // Redline: Engine is gasping for air, torque drops hard
     );
 
     // ================= UPDATE =================

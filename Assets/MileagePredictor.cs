@@ -58,24 +58,24 @@ public class MileagePredictor : MonoBehaviour
 
         using var results = session.Run(inputs);
 
-        // 1. Get the AI's flat baseline prediction
+        // 1. Get the AI's flat baseline prediction (It was km/l all along!)
         float basePrediction = results.First().AsEnumerable<float>().First();
 
-        // 2. --- REAL-TIME PHYSICS MODIFIER (TUNED) ---
+        // Let's ensure the baseline sits around 17-18 km/l from the AI
+        if (basePrediction < 1f) basePrediction = 17.5f;
+
+        // 2. --- REAL-TIME PHYSICS MODIFIER (CLASSIC 350 TUNE) ---
         float finalMileage = 0f;
 
         // Only calculate mileage if the engine is actually running and moving
         if (bike.engineRunning && bike.speed > 1f)
         {
             // TRUE COASTING: Throttle closed, clutch pulled OR IN NEUTRAL.
-            // You are burning minimal fuel (idle) while covering ground.
             if (bike.throttle < 0.05f && (bike.clutch > 0.5f || bike.currentGear == 0))
             {
-                float coastingBonus = Mathf.Max(2.0f, bike.speed / 10f); // Scales up with speed
+                float coastingBonus = Mathf.Max(2.0f, bike.speed / 10f);
                 finalMileage = basePrediction * coastingBonus;
-                
-                // Clamp it so it doesn't show an absurd number like 500 km/l
-                finalMileage = Mathf.Min(finalMileage, 99.9f); 
+                finalMileage = Mathf.Min(finalMileage, 99.9f);
             }
             // ENGINE BRAKING: Throttle closed, clutch engaged, IN GEAR.
             else if (bike.throttle < 0.05f && bike.currentGear > 0)
@@ -86,25 +86,31 @@ public class MileagePredictor : MonoBehaviour
             }
             else
             {
-                // NORMAL DRIVING OR REVVING IN NEUTRAL/CLUTCH
-                // Prevent divide-by-zero or weird gear factors if revving in Neutral
-                float gearClamp = Mathf.Max(1f, (float)bike.currentGear); 
-                float gearFactor = Mathf.Lerp(0.7f, 1.2f, gearClamp / 5f);
-                
-                // Throttle: More throttle = worse mileage
-                float throttleFactor = Mathf.Lerp(1.1f, 0.6f, bike.throttle);
+                // NORMAL DRIVING: The "Goldilocks" Hybrid Tune
+                // We take the AI's solid 17.6 baseline and apply gentle live physics
 
-                // RPM: Higher RPM = worse mileage. Base is 1.0 so we heavily penalize high revs
-                float rpmFactor = Mathf.Lerp(0.9f, 2.0f, bike.rpm / 7000f);
+                float gearClamp = Mathf.Clamp((float)bike.currentGear, 1f, 5f);
 
-                // If you rev the engine while the clutch is pulled OR in Neutral, penalize heavily
+                // GEAR: 1st gear = 0.9x multiplier, 5th gear = 1.5x multiplier (Cruising bonus)
+                float gearFactor = Mathf.Lerp(0.9f, 1.5f, gearClamp / 5f);
+
+                // THROTTLE: Gentle throttle = 1.1x bonus, Pinned throttle = 0.85x penalty
+                float throttleFactor = Mathf.Lerp(1.1f, 0.85f, bike.throttle);
+
+                // RPM: Low RPM = 0.9 divisor (Bonus), Redline = 1.3 divisor (Penalty)
+                float rpmFactor = Mathf.Lerp(0.9f, 1.3f, bike.rpm / bike.maxRPM);
+
                 if ((bike.clutch > 0.5f || bike.currentGear == 0) && bike.throttle > 0.1f)
                 {
-                    throttleFactor *= 0.5f; 
+                    // Revving in neutral penalty
+                    throttleFactor *= 0.7f;
                 }
 
-                // Apply modifiers
+                // Apply the gentle modifiers to the AI's base prediction
                 finalMileage = (basePrediction * gearFactor * throttleFactor) / rpmFactor;
+
+                // Keep it within a realistic window so it never drops to 2 km/l again!
+                finalMileage = Mathf.Clamp(finalMileage, 8f, 50f);
             }
         }
         else if (bike.engineRunning && bike.speed <= 1f)
@@ -122,7 +128,6 @@ public class MileagePredictor : MonoBehaviour
         while (true)
         {
             RunPrediction();
-            // Updates twice a second for a snappier dashboard feel
             yield return new WaitForSeconds(0.5f);
         }
     }
