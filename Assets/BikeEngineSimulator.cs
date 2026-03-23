@@ -11,6 +11,9 @@ public class BikeEngineSimulator : MonoBehaviour
     public float maxRPM = 8000f;
     public float stallRPM = 900f;
 
+    public float steerInput;
+    public float maxSteerAngle = 35f;
+
     // ================= SPEED =================
     public float speed;
     public float wheelSpeed;
@@ -27,7 +30,7 @@ public class BikeEngineSimulator : MonoBehaviour
     float smoothedBrakeInput = 0f;
 
     // ================= TRANSMISSION =================
-    public int currentGear = 1;
+    public int currentGear = 0; // Starts in Neutral
     public int maxGear = 5;
 
     // TOTAL reduction ratios (Primary Drive * Gearbox * Final Drive)
@@ -44,34 +47,38 @@ public class BikeEngineSimulator : MonoBehaviour
     public float engineMaxTorque = 80f;
     public float engineInertia = 0.2f;
     public float engineFriction = 5f;
-    public float idleGain = 0.05f;          // REDUCED: Allows the bike to stall properly
-    public float maxIdleTorque = 15f;       // NEW: Hard cap on anti-stall magic
+    public float idleGain = 0.05f;
+    public float maxIdleTorque = 15f;
 
     public float wheelRadius = 0.33f;
     public float bikeMass = 250f;
     public float wheelMassInertia = 27f;
 
-    public float brakePower = 200f;         // REDUCED: Stops the instant lock-up jumping
+    public float brakePower = 200f;
     public float currentBrakeForce = 0f;
 
     // ================= TORQUE (ROYAL ENFIELD TUNE) =================
     public AnimationCurve torqueCurve = new AnimationCurve(
-        new Keyframe(0.0f, 0.5f),  // Idle RPM: Already producing 50% torque! (The Thumper Grunt)
-        new Keyframe(0.2f, 0.8f),  // Low RPM: 80% torque (Pulls hard off the line)
-        new Keyframe(0.5f, 1.0f),  // Mid RPM: 100% Peak Torque 
-        new Keyframe(0.8f, 0.85f), // High RPM: Power starts dropping off
-        new Keyframe(1.0f, 0.4f)   // Redline: Engine is gasping for air, torque drops hard
+        new Keyframe(0.0f, 0.5f),  // Idle RPM
+        new Keyframe(0.2f, 0.8f),  // Low RPM
+        new Keyframe(0.5f, 1.0f),  // Mid RPM
+        new Keyframe(0.8f, 0.85f), // High RPM
+        new Keyframe(1.0f, 0.4f)   // Redline
     );
 
-    // ================= UPDATE =================
+    // ================= UPDATE (Inputs & State) =================
     void Update()
     {
         HandleInput();
         TryStarterMotor();
+        TryPushStart();
+    }
+
+    // ================= FIXED UPDATE (Physics Only) =================
+    void FixedUpdate()
+    {
         SimulateEngine();
         CheckStall();
-        TryPushStart();
-
     }
 
     // =================================================
@@ -99,14 +106,12 @@ public class BikeEngineSimulator : MonoBehaviour
             if (rb) brakeInput = rt;
             else throttleInput = rt;
 
-
-            // SHIFT ONLY IF CLUTCH LEVER PULLED (RAW INPUT — instant response)
+            // SHIFT ONLY IF CLUTCH LEVER PULLED
             if (clutchInput > 0.8f)
             {
                 if (Gamepad.current.buttonEast.wasPressedThisFrame) ShiftUp();
                 if (Gamepad.current.buttonWest.wasPressedThisFrame) ShiftDown();
             }
-
 
             if (Gamepad.current.buttonSouth.wasPressedThisFrame)
                 starterPressed = true;
@@ -130,11 +135,11 @@ public class BikeEngineSimulator : MonoBehaviour
         throttle = Mathf.Lerp(throttle, throttleInput, Time.deltaTime * throttleResponse);
         clutch = Mathf.Lerp(clutch, clutchInput, Time.deltaTime * clutchSpeed);
 
-        // Simulates hydraulic pressure and hand squeeze time
         smoothedBrakeInput = Mathf.Lerp(smoothedBrakeInput, brakeInput, Time.deltaTime * brakeResponse);
-
-        // Progressive braking curve (brakes bite harder the further you pull)
         float brakeStrength = smoothedBrakeInput * smoothedBrakeInput;
+
+        if (Gamepad.current != null) steerInput = Gamepad.current.leftStick.x.ReadValue();
+        else steerInput = Input.GetAxis("Horizontal"); // fallback for keyboard
 
         currentBrakeForce = brakeStrength * brakePower;
     }
@@ -143,7 +148,6 @@ public class BikeEngineSimulator : MonoBehaviour
     {
         if (!starterPressed) return;
 
-        // REAL LIFE: Can start without clutch ONLY IF in Neutral
         if (clutchInputRaw < 0.9f && currentGear != 0) return;
 
         if (engineRunning)
@@ -157,9 +161,6 @@ public class BikeEngineSimulator : MonoBehaviour
         }
     }
 
-    // =================================================
-    // PUSH START
-    // =================================================
     void TryPushStart()
     {
         if (!pushStartPressed) return;
@@ -171,22 +172,16 @@ public class BikeEngineSimulator : MonoBehaviour
         }
     }
 
-
-    // =================================================
-    // STALL
-    // =================================================
     void CheckStall()
     {
         if (!engineRunning) return;
 
-        // HARD stall — engine stopped rotating
         if (rpm <= 50f)
         {
             StallEngine();
             return;
         }
 
-        // LOAD stall — engine bogs under load (Won't stall in Neutral!)
         if (rpm <= stallRPM && clutch < bitePoint && currentGear > 0)
         {
             StallEngine();
@@ -196,20 +191,13 @@ public class BikeEngineSimulator : MonoBehaviour
     void StallEngine()
     {
         engineRunning = false;
-        // Removed rpm = 0f; so the engine block can spin down naturally and be bumped by the clutch
     }
 
-
-    // =================================================
-    // SHIFT
-    // =================================================
     void ShiftUp()
     {
         if (currentGear < maxGear)
         {
             currentGear++;
-
-            // Small realistic rpm drop when engaging a higher gear
             if (currentGear > 1)
             {
                 rpm *= 0.90f;
@@ -220,12 +208,9 @@ public class BikeEngineSimulator : MonoBehaviour
 
     void ShiftDown()
     {
-        // Allow shifting all the way down to 0 (Neutral)
         if (currentGear > 0)
         {
             currentGear--;
-
-            // Realistic rpm rise only if shifting between driven gears (not into Neutral)
             if (currentGear > 0)
             {
                 rpm *= 1.10f;
@@ -235,19 +220,17 @@ public class BikeEngineSimulator : MonoBehaviour
     }
 
     // =================================================
-    // PHYSICS
+    // PHYSICS (Now uses FixedDeltaTime)
     // =================================================
     void SimulateEngine()
     {
         float gearRatio = gearRatios[currentGear];
-
         float engineRadS = rpm * Mathf.PI / 30f;
         float wheelRadS = wheelSpeed;
 
-        // ---------------- ENGINE TORQUE GENERATION ----------------
+        // ---------------- ENGINE TORQUE ----------------
         float totalEngineTorque = 0f;
 
-        // If engine is off, it bypasses combustion, but KEEPS the drivetrain connected!
         if (engineRunning)
         {
             float normalizedRPM = Mathf.InverseLerp(0, maxRPM, rpm);
@@ -262,7 +245,7 @@ public class BikeEngineSimulator : MonoBehaviour
             totalEngineTorque = throttleTorque + idleSupport;
         }
 
-        // ---------------- CLUTCH & SLIP PHYSICS ----------------
+        // ---------------- CLUTCH ----------------
         float engagement = Mathf.Clamp01(1f - clutch);
         float currentClutchCapacity = maxClutchTorque * engagement;
 
@@ -272,51 +255,57 @@ public class BikeEngineSimulator : MonoBehaviour
         float transmittedTorque = slipSpeed * clutchStiffness * engagement;
         transmittedTorque = Mathf.Clamp(transmittedTorque, -currentClutchCapacity, currentClutchCapacity);
 
-        float maxSyncTorque = (Mathf.Abs(slipSpeed) / Time.deltaTime) * engineInertia;
+        float maxSyncTorque = (Mathf.Abs(slipSpeed) / Time.fixedDeltaTime) * engineInertia;
         transmittedTorque = Mathf.Clamp(transmittedTorque, -maxSyncTorque, maxSyncTorque);
 
         if (currentGear == 0) transmittedTorque = 0f;
 
-        // ---------------- ENGINE ACCELERATION & DRAG ----------------
+        // ---------------- ENGINE ACCELERATION ----------------
         float closedThrottleFactor = engineRunning ? (1f - throttle) : 1f;
         float pumpingLoss = (rpm / maxRPM) * 80f * closedThrottleFactor;
-
         float dynamicEngineDrag = engineFriction + pumpingLoss;
 
         float netEngineTorque = totalEngineTorque - transmittedTorque - dynamicEngineDrag;
         float engineAccel = netEngineTorque / engineInertia;
-        engineRadS += engineAccel * Time.deltaTime;
+        engineRadS += engineAccel * Time.fixedDeltaTime;
 
         rpm = engineRadS * 30f / Mathf.PI;
         rpm = Mathf.Clamp(rpm, 0f, maxRPM);
 
-        // ---------------- WHEEL ACCELERATION & BRAKING ----------------
+        // ---------------- WHEEL ACCELERATION ----------------
         float wheelDriveTorque = transmittedTorque * gearRatio;
-
         float linearSpeed = wheelRadS * wheelRadius;
         float aeroDragMain = (0.5f * 1.225f * 0.4f * linearSpeed * linearSpeed) * wheelRadius * 0.2f;
         float rollingResMain = (bikeMass * 9.81f * 0.005f) * wheelRadius;
 
-        // ANTI-JUMP BRAKES: Never exceed the torque required to stop the wheel in one frame
-        float maxBrakeTorqueAllowed = (wheelRadS / Time.deltaTime) * wheelMassInertia;
+        float maxBrakeTorqueAllowed = (wheelRadS / Time.fixedDeltaTime) * wheelMassInertia;
         float appliedBrakeTorque = Mathf.Min(currentBrakeForce, maxBrakeTorqueAllowed);
 
         float netWheelTorque = wheelDriveTorque - aeroDragMain - rollingResMain - appliedBrakeTorque;
-
         float wheelAccel = netWheelTorque / wheelMassInertia;
-        wheelRadS += wheelAccel * Time.deltaTime;
+        wheelRadS += wheelAccel * Time.fixedDeltaTime;
         wheelRadS = Mathf.Max(0f, wheelRadS);
 
         wheelSpeed = wheelRadS;
         speed = wheelSpeed * wheelRadius * 3.6f;
-    }
-    float RPMToRad(float r)
-    {
-        return r * 2f * Mathf.PI / 60f;
-    }
 
-    float RadToRPM(float w)
-    {
-        return w * 60f / (2f * Mathf.PI);
+        // --- 3D MOVEMENT & STEERING ---
+        float moveSpeed = speed / 3.6f;
+
+        // GHOST MOVEMENT FIX: Kill physical movement if in neutral or clutching
+        if (currentGear == 0 || clutch > 0.98f)
+        {
+            moveSpeed = 0f;
+        }
+
+        transform.Translate(Vector3.forward * moveSpeed * Time.fixedDeltaTime);
+
+        float speedTurnFactor = Mathf.Clamp(15f / Mathf.Max(speed, 1f), 0.2f, 1f);
+        float turnAmount = steerInput * maxSteerAngle * speedTurnFactor * Time.fixedDeltaTime;
+
+        if (speed > 5f)
+        {
+            transform.Rotate(Vector3.up * turnAmount * 1.5f);
+        }
     }
 }
