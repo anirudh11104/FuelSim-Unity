@@ -67,17 +67,45 @@ public class MileagePredictor : MonoBehaviour
         // Only calculate mileage if the engine is actually running and moving
         if (bike.engineRunning && bike.speed > 1f)
         {
-            // RPM: Maps 0-7000 RPM to a soft modifier (0.8 = good, 1.5 = heavy fuel use)
-            float rpmFactor = Mathf.Lerp(0.8f, 1.5f, bike.rpm / 7000f);
+            // TRUE COASTING: Throttle closed, clutch pulled OR IN NEUTRAL.
+            // You are burning minimal fuel (idle) while covering ground.
+            if (bike.throttle < 0.05f && (bike.clutch > 0.5f || bike.currentGear == 0))
+            {
+                float coastingBonus = Mathf.Max(2.0f, bike.speed / 10f); // Scales up with speed
+                finalMileage = basePrediction * coastingBonus;
+                
+                // Clamp it so it doesn't show an absurd number like 500 km/l
+                finalMileage = Mathf.Min(finalMileage, 99.9f); 
+            }
+            // ENGINE BRAKING: Throttle closed, clutch engaged, IN GEAR.
+            else if (bike.throttle < 0.05f && bike.currentGear > 0)
+            {
+                float engineBrakeBonus = Mathf.Max(1.5f, bike.speed / 15f);
+                finalMileage = basePrediction * engineBrakeBonus;
+                finalMileage = Mathf.Min(finalMileage, 99.9f);
+            }
+            else
+            {
+                // NORMAL DRIVING OR REVVING IN NEUTRAL/CLUTCH
+                // Prevent divide-by-zero or weird gear factors if revving in Neutral
+                float gearClamp = Mathf.Max(1f, (float)bike.currentGear); 
+                float gearFactor = Mathf.Lerp(0.7f, 1.2f, gearClamp / 5f);
+                
+                // Throttle: More throttle = worse mileage
+                float throttleFactor = Mathf.Lerp(1.1f, 0.6f, bike.throttle);
 
-            // Gear: 1st gear = 0.7x multiplier (worse), 5th gear = 1.2x multiplier (better)
-            float gearFactor = Mathf.Lerp(0.7f, 1.2f, bike.currentGear / 5f);
+                // RPM: Higher RPM = worse mileage. Base is 1.0 so we heavily penalize high revs
+                float rpmFactor = Mathf.Lerp(0.9f, 2.0f, bike.rpm / 7000f);
 
-            // Throttle: Coasting (0 throttle) = 1.1x bonus, Full throttle = 0.8x penalty
-            float throttlePenalty = Mathf.Lerp(1.1f, 0.8f, bike.throttle);
+                // If you rev the engine while the clutch is pulled OR in Neutral, penalize heavily
+                if ((bike.clutch > 0.5f || bike.currentGear == 0) && bike.throttle > 0.1f)
+                {
+                    throttleFactor *= 0.5f; 
+                }
 
-            // Apply our softer modifiers to the AI's base prediction
-            finalMileage = (basePrediction * gearFactor * throttlePenalty) / rpmFactor;
+                // Apply modifiers
+                finalMileage = (basePrediction * gearFactor * throttleFactor) / rpmFactor;
+            }
         }
         else if (bike.engineRunning && bike.speed <= 1f)
         {

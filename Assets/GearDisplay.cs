@@ -10,7 +10,14 @@ public class GearDisplay : MonoBehaviour
     {
         if (vehicle != null && gearText != null)
         {
-            gearText.text = "GEAR: " + vehicle.currentGear;
+            if (vehicle.currentGear == 0)
+            {
+                gearText.text = "GEAR: N";
+            }
+            else
+            {
+                gearText.text = "GEAR: " + vehicle.currentGear;
+            }
         }
     }
 }

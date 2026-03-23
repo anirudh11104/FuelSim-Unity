@@ -143,8 +143,8 @@ public class BikeEngineSimulator : MonoBehaviour
     {
         if (!starterPressed) return;
 
-        // require clutch pulled
-        if (clutchInputRaw < 0.9f) return;
+        // REAL LIFE: Can start without clutch ONLY IF in Neutral
+        if (clutchInputRaw < 0.9f && currentGear != 0) return;
 
         if (engineRunning)
         {
@@ -186,7 +186,7 @@ public class BikeEngineSimulator : MonoBehaviour
             return;
         }
 
-        // LOAD stall — engine bogs under load
+        // LOAD stall — engine bogs under load (Won't stall in Neutral!)
         if (rpm <= stallRPM && clutch < bitePoint && currentGear > 0)
         {
             StallEngine();
@@ -209,24 +209,28 @@ public class BikeEngineSimulator : MonoBehaviour
         {
             currentGear++;
 
-            // small realistic rpm drop
-            rpm *= 0.90f;
-
-            // never drop below idle
-            rpm = Mathf.Max(rpm, idleRPM * 0.8f);
+            // Small realistic rpm drop when engaging a higher gear
+            if (currentGear > 1)
+            {
+                rpm *= 0.90f;
+                rpm = Mathf.Max(rpm, idleRPM * 0.8f);
+            }
         }
     }
 
     void ShiftDown()
     {
-        if (currentGear > 1)
+        // Allow shifting all the way down to 0 (Neutral)
+        if (currentGear > 0)
         {
             currentGear--;
 
-            // realistic rpm rise
-            rpm *= 1.10f;
-
-            rpm = Mathf.Min(rpm, maxRPM);
+            // Realistic rpm rise only if shifting between driven gears (not into Neutral)
+            if (currentGear > 0)
+            {
+                rpm *= 1.10f;
+                rpm = Mathf.Min(rpm, maxRPM);
+            }
         }
     }
 
