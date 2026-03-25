@@ -49,3 +49,9 @@ Thumbs.db
 *.onnx
 # *.mp3  (Remove the '#' if you want to ignore audio files too)
 # *.wav  (Remove the '#' if you want to ignore audio files too)
+
+# --- BAKED LIGHTING & HEAVY SCENE DATA ---
+LightingData.asset*
+Lightmap-*
+ReflectionProbe-*
+OcclusionCullingData.asset*

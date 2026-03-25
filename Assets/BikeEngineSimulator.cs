@@ -293,9 +293,12 @@ public class BikeEngineSimulator : MonoBehaviour
         float moveSpeed = speed / 3.6f;
 
         // GHOST MOVEMENT FIX: Kill physical movement if in neutral or clutching
+        // MOMENTUM FIX: Let the bike coast if you pull the clutch or hit neutral
         if (currentGear == 0 || clutch > 0.98f)
         {
-            moveSpeed = 0f;
+            // Gradually slow down instead of instantly stopping (Coasting)
+            speed = Mathf.Lerp(speed, 0f, Time.fixedDeltaTime * 0.5f);
+            moveSpeed = speed / 3.6f;
         }
 
         transform.Translate(Vector3.forward * moveSpeed * Time.fixedDeltaTime);
