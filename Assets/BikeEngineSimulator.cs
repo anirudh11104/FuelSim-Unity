@@ -13,6 +13,7 @@ public class BikeEngineSimulator : MonoBehaviour
 
     public float steerInput;
     public float maxSteerAngle = 35f;
+    public Transform frontAssembly; // The visual group for the Handlebars/Fork/Wheel
 
     // ================= SPEED =================
     public float speed;
@@ -65,6 +66,12 @@ public class BikeEngineSimulator : MonoBehaviour
         new Keyframe(0.8f, 0.85f), // High RPM
         new Keyframe(1.0f, 0.4f)   // Redline
     );
+
+    void Start()
+    {
+        // The Pendulum Trick: Forces the bike to balance itself naturally!
+        GetComponent<Rigidbody>().centerOfMass = new Vector3(0, -0.8f, 0);
+    }
 
     // ================= UPDATE (Inputs & State) =================
     void Update()
@@ -134,6 +141,9 @@ public class BikeEngineSimulator : MonoBehaviour
 
         throttle = Mathf.Lerp(throttle, throttleInput, Time.deltaTime * throttleResponse);
         clutch = Mathf.Lerp(clutch, clutchInput, Time.deltaTime * clutchSpeed);
+
+        if (throttle < 0.001f) throttle = 0f;
+        if (clutch < 0.001f) clutch = 0f;
 
         smoothedBrakeInput = Mathf.Lerp(smoothedBrakeInput, brakeInput, Time.deltaTime * brakeResponse);
         float brakeStrength = smoothedBrakeInput * smoothedBrakeInput;
@@ -289,26 +299,83 @@ public class BikeEngineSimulator : MonoBehaviour
         wheelSpeed = wheelRadS;
         speed = wheelSpeed * wheelRadius * 3.6f;
 
-        // --- 3D MOVEMENT & STEERING ---
-        float moveSpeed = speed / 3.6f;
+        // --- OVERHAULED RIGIDBODY PHYSICS ---
+        Rigidbody rb = GetComponent<Rigidbody>();
 
-        // GHOST MOVEMENT FIX: Kill physical movement if in neutral or clutching
-        // MOMENTUM FIX: Let the bike coast if you pull the clutch or hit neutral
-        if (currentGear == 0 || clutch > 0.98f)
+        // 1. SYNC THE GAUGES TO REALITY 
+        float realForwardSpeed = Vector3.Dot(rb.velocity, transform.forward);
+        speed = Mathf.Max(0f, realForwardSpeed * 3.6f);
+
+        // Force the engine math to match the physical speed of the heavy bike
+        wheelRadS = (speed / 3.6f) / wheelRadius;
+        wheelSpeed = wheelRadS;
+
+        // 2. VISUAL STEERING
+        if (frontAssembly != null)
         {
-            // Gradually slow down instead of instantly stopping (Coasting)
-            speed = Mathf.Lerp(speed, 0f, Time.fixedDeltaTime * 0.5f);
-            moveSpeed = speed / 3.6f;
+            Quaternion targetSteer = Quaternion.Euler(0, steerInput * maxSteerAngle, 0);
+            frontAssembly.localRotation = Quaternion.Slerp(frontAssembly.localRotation, targetSteer, Time.fixedDeltaTime * 10f);
         }
 
-        transform.Translate(Vector3.forward * moveSpeed * Time.fixedDeltaTime);
-
-        float speedTurnFactor = Mathf.Clamp(15f / Mathf.Max(speed, 1f), 0.2f, 1f);
-        float turnAmount = steerInput * maxSteerAngle * speedTurnFactor * Time.fixedDeltaTime;
-
-        if (speed > 5f)
+        // 3. PUSH THE BIKE FORWARD (FLAT TO THE GROUND - KILLS THE ROCKET GLITCH)
+        if (currentGear > 0 && clutch < 0.98f)
         {
-            transform.Rotate(Vector3.up * turnAmount * 1.5f);
+            float driveForce = netWheelTorque / wheelRadius;
+
+            // Flatten the forward direction so the engine ONLY pushes horizontally, never up!
+            Vector3 forwardFlat = new Vector3(transform.forward.x, 0, transform.forward.z).normalized;
+            rb.AddForce(forwardFlat * driveForce, ForceMode.Force);
+        }
+
+        // (Typo fixed here!)
+        rb.drag = (throttle < 0.1f) ? 0.5f : 0.05f;
+
+        // --- 4. ARCADE-PERFECT STEERING & ANTI-DRIFT ---
+
+        // A. KILL THE GAMEPAD STICK DRIFT (The Deadzone)
+        float cleanSteer = steerInput;
+        if (Mathf.Abs(cleanSteer) < 0.2f)
+        {
+            cleanSteer = 0f;
+        }
+
+        // B. STEERING & LEANING
+        // B. STEERING & LEANING
+        if (speed > 1f)
+        {
+            // 1. Calculate Steering & Leaning in ONE step (Kills the Physics Explosions)
+            float newY = rb.rotation.eulerAngles.y + (cleanSteer * 60f * Time.fixedDeltaTime);
+            float newZ = Mathf.LerpAngle(rb.rotation.eulerAngles.z, -cleanSteer * 35f, Time.fixedDeltaTime * 8f);
+
+            // Move it exactly once per frame!
+            rb.MoveRotation(Quaternion.Euler(rb.rotation.eulerAngles.x, newY, newZ));
+
+            // 2. THE "TRON" GRIP (Kills the Speed of Light Glitch)
+            // We force the forward direction to be perfectly flat, ignoring any wheelies/tilts
+            Vector3 flatForward = new Vector3(transform.forward.x, 0, transform.forward.z).normalized;
+            Vector3 flatVelocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
+
+            float forwardSpeedMath = Vector3.Dot(flatVelocity, flatForward);
+
+            // Apply pure flat driving + perfectly normal gravity
+            rb.velocity = (flatForward * forwardSpeedMath) + new Vector3(0, rb.velocity.y, 0);
+        }
+        else
+        {
+            // 1. Stand up straight when stopped
+            Vector3 currentEuler = rb.rotation.eulerAngles;
+            Quaternion upright = Quaternion.Euler(currentEuler.x, currentEuler.y, 0f);
+            rb.MoveRotation(Quaternion.Slerp(rb.rotation, upright, Time.fixedDeltaTime * 5f));
+
+            // 2. THE PARKING BRAKE (Kills the Ice Cube sliding effect)
+            if (throttle < 0.1f)
+            {
+                // Wipe out all forward/backward/sideways sliding, but keep Y so gravity works
+                rb.velocity = new Vector3(0, rb.velocity.y, 0);
+
+                // Wipe out all microscopic spinning/drifting
+                rb.angularVelocity = Vector3.zero;
+            }
         }
     }
 }

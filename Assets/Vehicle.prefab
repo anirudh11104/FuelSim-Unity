@@ -552,6 +552,7 @@ MonoBehaviour:
   stallRPM: 900
   steerInput: 0
   maxSteerAngle: 12
+  frontAssembly: {fileID: 0}
   speed: 0
   wheelSpeed: 0
   throttle: 1e-45
@@ -1686,8 +1687,6 @@ GameObject:
   - component: {fileID: 2017441104753818699}
   - component: {fileID: 5797957553359599033}
   - component: {fileID: 7370921501055783851}
-  - component: {fileID: 788312603402481080}
-  - component: {fileID: 7606124724212601330}
   m_Layer: 0
   m_Name: SuperMotors_3_016
   m_TagString: Untagged
@@ -1768,35 +1767,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &788312603402481080
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7361235508541492788}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3bd3bfde751e77543b99826eedabc017, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  bike: {fileID: 7861011860946118588}
-  maxVisualSteerAngle: 35
-  steeringSmoothness: 5
---- !u!114 &7606124724212601330
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7361235508541492788}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9c45db117803a9649935de2165ba4ef9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  bike: {fileID: 7861011860946118588}
-  maxVisualSteerAngle: 30
 --- !u!1 &7566520222334183427
 GameObject:
   m_ObjectHideFlags: 0
