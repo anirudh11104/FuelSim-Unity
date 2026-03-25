@@ -340,42 +340,45 @@ public class BikeEngineSimulator : MonoBehaviour
         }
 
         // B. STEERING & LEANING
-        // B. STEERING & LEANING
         if (speed > 1f)
         {
-            // 1. Calculate Steering & Leaning in ONE step (Kills the Physics Explosions)
+            // 1. Calculate Steering & Leaning in ONE step
             float newY = rb.rotation.eulerAngles.y + (cleanSteer * 60f * Time.fixedDeltaTime);
             float newZ = Mathf.LerpAngle(rb.rotation.eulerAngles.z, -cleanSteer * 35f, Time.fixedDeltaTime * 8f);
 
             // Move it exactly once per frame!
             rb.MoveRotation(Quaternion.Euler(rb.rotation.eulerAngles.x, newY, newZ));
 
-            // 2. THE "TRON" GRIP (Kills the Speed of Light Glitch)
-            // We force the forward direction to be perfectly flat, ignoring any wheelies/tilts
+            // 2. THE "TRON" GRIP 
             Vector3 flatForward = new Vector3(transform.forward.x, 0, transform.forward.z).normalized;
             Vector3 flatVelocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
 
             float forwardSpeedMath = Vector3.Dot(flatVelocity, flatForward);
-
-            // Apply pure flat driving + perfectly normal gravity
             rb.velocity = (flatForward * forwardSpeedMath) + new Vector3(0, rb.velocity.y, 0);
+
+            // --- FIX 1: KILLS THE OFFICE CHAIR EFFECT ---
+            // Forces the physics engine to stop twisting the bike when the pendulum swings!
+            rb.angularVelocity = Vector3.zero;
         }
         else
         {
-            // 1. Stand up straight when stopped
+            // Stand up straight when stopped
             Vector3 currentEuler = rb.rotation.eulerAngles;
             Quaternion upright = Quaternion.Euler(currentEuler.x, currentEuler.y, 0f);
             rb.MoveRotation(Quaternion.Slerp(rb.rotation, upright, Time.fixedDeltaTime * 5f));
 
-            // 2. THE PARKING BRAKE (Kills the Ice Cube sliding effect)
+            // THE PARKING BRAKE
             if (throttle < 0.1f)
             {
-                // Wipe out all forward/backward/sideways sliding, but keep Y so gravity works
                 rb.velocity = new Vector3(0, rb.velocity.y, 0);
-
-                // Wipe out all microscopic spinning/drifting
                 rb.angularVelocity = Vector3.zero;
             }
         }
+
+        // --- FIX 2: ABSOLUTE INSPECTOR CLEANUP ---
+        // By putting this at the VERY END of FixedUpdate, we guarantee 0 on the UI
+        if (speed < 0.1f) speed = 0f;
+        if (wheelSpeed < 0.1f) wheelSpeed = 0f;
+        if (clutch < 0.001f) clutch = 0f;
     }
 }
