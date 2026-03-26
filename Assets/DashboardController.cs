@@ -1,12 +1,17 @@
 using UnityEngine;
 using System.Collections;
+using UnityEngine.InputSystem;
+using TMPro;
 
 public class DashboardController : MonoBehaviour
 {
     [Header("Connections")]
-    public BikeEngineSimulator vehicle; // Drag your Vehicle here
+    public BikeEngineSimulator vehicle;
     public RectTransform speedNeedle;
     public RectTransform rpmNeedle;
+
+    [Header("Digital Displays")]
+    public TextMeshProUGUI gearText; // Kept this for the Gear Display!
 
     [Header("Speedometer Settings")]
     public float speedMinAngle = 140f;
@@ -18,40 +23,54 @@ public class DashboardController : MonoBehaviour
     public float rpmMaxAngle = -140f;
     public float maxRPM = 8000f;
 
-    [Header("Needle Weight (Fixes Flicker)")]
-    [Range(0.01f, 0.5f)]
-    public float needleSmoothing = 0.2f; // Higher = Heavier/Smoother needle
+    [Header("The Ultimate Flicker Fix")]
+    [Range(0.01f, 1f)]
+    public float needleResponsiveness = 0.15f;
 
     [Header("Startup Animation")]
     public float sweepDuration = 1.0f;
 
-    private bool isStartingUp = true;
+    private bool isStartingUp = false;
     private float smoothSpeed;
     private float smoothRPM;
+    private float speedVelocity;
+    private float rpmVelocity;
+
+    private bool wasGamepadConnected = false;
 
     void Start()
     {
-        // Now happens as soon as you hit PLAY
-        StartCoroutine(StartupSweep());
+        if (vehicle == null)
+            vehicle = FindFirstObjectByType<BikeEngineSimulator>();
     }
 
     void Update()
     {
+        bool isGamepadConnected = Gamepad.current != null;
+        if (isGamepadConnected && !wasGamepadConnected)
+        {
+            StopAllCoroutines();
+            StartCoroutine(StartupSweep());
+        }
+        wasGamepadConnected = isGamepadConnected;
+
         if (isStartingUp || vehicle == null) return;
 
-        // 1. FILTER THE JITTER: 
-        // We use Lerp to create a "Heavy Needle" effect. 
-        // This ignores the tiny physics vibrations in 1st gear.
-        smoothSpeed = Mathf.Lerp(smoothSpeed, vehicle.speed, needleSmoothing);
-        smoothRPM = Mathf.Lerp(smoothRPM, vehicle.rpm, needleSmoothing);
+        smoothSpeed = Mathf.SmoothDamp(smoothSpeed, vehicle.speed, ref speedVelocity, needleResponsiveness);
+        smoothRPM = Mathf.SmoothDamp(smoothRPM, vehicle.rpm, ref rpmVelocity, needleResponsiveness);
 
-        // 2. CALCULATE PERCENTAGES
         float speedPercent = Mathf.Clamp01(smoothSpeed / maxSpeed);
         float rpmPercent = Mathf.Clamp01(smoothRPM / maxRPM);
 
-        // 3. APPLY ROTATION
         speedNeedle.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(speedMinAngle, speedMaxAngle, speedPercent));
         rpmNeedle.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(rpmMinAngle, rpmMaxAngle, rpmPercent));
+
+        // --- GEAR DISPLAY ONLY ---
+        if (gearText != null)
+        {
+            string currentGearStr = vehicle.currentGear == 0 ? "N" : vehicle.currentGear.ToString();
+            gearText.text = "Gear: " + currentGearStr;
+        }
     }
 
     IEnumerator StartupSweep()
@@ -59,7 +78,6 @@ public class DashboardController : MonoBehaviour
         isStartingUp = true;
         float timer = 0f;
 
-        // Sweep Up
         while (timer < sweepDuration)
         {
             timer += Time.deltaTime;
@@ -70,7 +88,6 @@ public class DashboardController : MonoBehaviour
         }
 
         timer = 0f;
-        // Sweep Down
         while (timer < sweepDuration)
         {
             timer += Time.deltaTime;
@@ -79,6 +96,9 @@ public class DashboardController : MonoBehaviour
             rpmNeedle.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(rpmMaxAngle, rpmMinAngle, p));
             yield return null;
         }
+
+        smoothSpeed = vehicle != null ? vehicle.speed : 0;
+        smoothRPM = vehicle != null ? vehicle.rpm : 0;
 
         isStartingUp = false;
     }

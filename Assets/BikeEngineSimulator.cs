@@ -344,7 +344,7 @@ public class BikeEngineSimulator : MonoBehaviour
         else
         {
             // Normal engine behavior (Engine braking or driving).
-            rb.drag = (throttle < 0.1f) ? 0.5f : 0.05f;
+            rb.drag = (throttle < 0.1f) ? 0.15f : 0.05f;
         }
 
         // --- 4. ARCADE-PERFECT STEERING & ANTI-DRIFT ---
