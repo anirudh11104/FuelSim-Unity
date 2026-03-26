@@ -114,7 +114,7 @@ public class BikeEngineSimulator : MonoBehaviour
             else throttleInput = rt;
 
             // SHIFT ONLY IF CLUTCH LEVER PULLED
-            if (clutchInput > 0.8f)
+            if (clutchInputRaw > 0.8f)
             {
                 if (Gamepad.current.buttonEast.wasPressedThisFrame) ShiftUp();
                 if (Gamepad.current.buttonWest.wasPressedThisFrame) ShiftDown();
@@ -130,7 +130,7 @@ public class BikeEngineSimulator : MonoBehaviour
         if (Input.GetKey(KeyCode.LeftShift)) clutchInputRaw = 1f;
         if (Input.GetKey(KeyCode.S)) brakeInput = 1;
 
-        if (clutchInput > 0.8f)
+        if (clutchInputRaw > 0.8f)
         {
             if (Input.GetKeyDown(KeyCode.E)) ShiftUp();
             if (Input.GetKeyDown(KeyCode.Q)) ShiftDown();
@@ -328,15 +328,20 @@ public class BikeEngineSimulator : MonoBehaviour
             rb.AddForce(forwardFlat * driveForce, ForceMode.Force);
         }
 
-        // --- COASTING LOGIC ---
-        // If clutch is pulled (> 0.9), engine is disconnected = NO DRAG.
-        // If clutch is out and throttle is 0 = ENGINE BRAKING (0.5 drag).
-        if (clutch > 0.9f)
+        // --- BRAKE & COASTING PRIORITY ---
+        if (currentBrakeForce > 10f)
         {
-            rb.drag = 0.01f; // Ultra smooth coasting
+            // If the brake is pressed, ignore the clutch and stop the bike!
+            rb.drag = 2.0f;
+        }
+        else if (clutch > 0.9f)
+        {
+            // If no brake, but clutch is pulled, glide smoothly.
+            rb.drag = 0.01f;
         }
         else
         {
+            // Normal engine behavior (Engine braking or driving).
             rb.drag = (throttle < 0.1f) ? 0.5f : 0.05f;
         }
 
@@ -378,7 +383,7 @@ public class BikeEngineSimulator : MonoBehaviour
             rb.MoveRotation(Quaternion.Slerp(rb.rotation, upright, Time.fixedDeltaTime * 5f));
 
             // THE PARKING BRAKE
-            if (throttle < 0.1f)
+            if (throttle < 0.1f && clutch < 0.5f) // Only park if throttle is 0 AND clutch is out
             {
                 rb.velocity = new Vector3(0, rb.velocity.y, 0);
                 rb.angularVelocity = Vector3.zero;
