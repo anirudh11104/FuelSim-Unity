@@ -2,12 +2,21 @@ using UnityEngine;
 
 public class NeedleController : MonoBehaviour
 {
+    public BikeEngineSimulator bike;
+
+    [Header("What is this needle reading?")]
+    public bool isRPMNeedle = true; // Check box for RPM, uncheck for Speed
+
+    [Header("Values")]
     public float minValue = 0f;
-    public float maxValue = 8000f;
+    public float maxValue = 8000f; // E.g., 8000 for RPM, 180 for Speed
 
     [Header("Rotation Calibration")]
     public float minAngle = -120f;
     public float maxAngle = 120f;
+
+    [Header("3D Axis To Spin")]
+    public Vector3 spinAxis = new Vector3(0, 0, 1); // 1 on the axis you want to spin (X, Y, or Z)
 
     [Header("Physics Feel")]
     public float needleSnappiness = 15f;
@@ -16,22 +25,22 @@ public class NeedleController : MonoBehaviour
 
     void Start()
     {
-        // Start the needle at zero when the game boots
         currentAngle = minAngle;
     }
 
-    public void SetValue(float value)
+    void Update() // Changed to Update so it reads automatically!
     {
-        // Find out what percentage (0 to 1) the current value is at
+        if (bike == null) return;
+
+        // 1. Read the correct value from the engine
+        float value = isRPMNeedle ? bike.rpm : bike.speed;
+
+        // 2. Do the math
         float t = Mathf.InverseLerp(minValue, maxValue, value);
-
-        // Calculate where the needle *wants* to be
         float targetAngle = Mathf.Lerp(minAngle, maxAngle, t);
-
-        // Smoothly glide the needle towards the target instead of teleporting
         currentAngle = Mathf.Lerp(currentAngle, targetAngle, Time.deltaTime * needleSnappiness);
 
-        // Apply it to the graphic
-        transform.localRotation = Quaternion.Euler(0, 0, -currentAngle);
+        // 3. Spin the 3D mesh!
+        transform.localRotation = Quaternion.Euler(spinAxis * currentAngle);
     }
 }

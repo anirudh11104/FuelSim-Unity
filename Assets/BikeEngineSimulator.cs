@@ -58,6 +58,8 @@ public class BikeEngineSimulator : MonoBehaviour
     public float brakePower = 200f;
     public float currentBrakeForce = 0f;
 
+    public DashboardController dash;
+
     // ================= TORQUE (ROYAL ENFIELD TUNE) =================
     public AnimationCurve torqueCurve = new AnimationCurve(
         new Keyframe(0.0f, 0.5f),  // Idle RPM
