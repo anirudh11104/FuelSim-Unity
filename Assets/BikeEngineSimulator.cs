@@ -317,18 +317,28 @@ public class BikeEngineSimulator : MonoBehaviour
             frontAssembly.localRotation = Quaternion.Slerp(frontAssembly.localRotation, targetSteer, Time.fixedDeltaTime * 10f);
         }
 
-        // 3. PUSH THE BIKE FORWARD (FLAT TO THE GROUND - KILLS THE ROCKET GLITCH)
-        if (currentGear > 0 && clutch < 0.98f)
+        // 3. PUSH THE BIKE FORWARD 
+        // THE JITTER KILLER: We completely sever the physical drive force if the clutch is pulled in!
+        if (currentGear > 0 && clutch < 0.75f)
         {
             float driveForce = netWheelTorque / wheelRadius;
 
-            // Flatten the forward direction so the engine ONLY pushes horizontally, never up!
+            // Flatten the forward direction so the engine ONLY pushes horizontally
             Vector3 forwardFlat = new Vector3(transform.forward.x, 0, transform.forward.z).normalized;
             rb.AddForce(forwardFlat * driveForce, ForceMode.Force);
         }
 
-        // (Typo fixed here!)
-        rb.drag = (throttle < 0.1f) ? 0.5f : 0.05f;
+        // --- COASTING LOGIC ---
+        // If clutch is pulled (> 0.9), engine is disconnected = NO DRAG.
+        // If clutch is out and throttle is 0 = ENGINE BRAKING (0.5 drag).
+        if (clutch > 0.9f)
+        {
+            rb.drag = 0.01f; // Ultra smooth coasting
+        }
+        else
+        {
+            rb.drag = (throttle < 0.1f) ? 0.5f : 0.05f;
+        }
 
         // --- 4. ARCADE-PERFECT STEERING & ANTI-DRIFT ---
 
