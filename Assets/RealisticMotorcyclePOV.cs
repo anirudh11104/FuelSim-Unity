@@ -61,26 +61,23 @@ public class RealisticMotorcyclePOV : MonoBehaviour
         if (vehicle == null) return;
 
         // --- 1. MANUAL LOOK (Right Stick ONLY) ---
-        // Grabs ONLY the gamepad right stick, ignoring the mouse completely
         float inputX = Input.GetAxis("RightStick X");
         float inputY = Input.GetAxis("RightStick Y");
 
-        // Added a 0.1f deadzone check here so tiny stick drift doesn't make the camera shake
         if (Mathf.Abs(inputX) > 0.1f || Mathf.Abs(inputY) > 0.1f)
         {
-            // Multiplying by Time.deltaTime makes the stick perfectly smooth and frame-rate independent.
-            // (I added * 100f so your current Inspector sensitivity of '2' still feels good!)
+            // Player is pushing the stick, move the head
             currentManualYaw += inputX * lookSensitivity * 100f * Time.deltaTime;
             currentManualPitch += inputY * lookSensitivity * 100f * Time.deltaTime;
         }
         else
         {
-            // Auto-center the head smoothly when not touching the stick
+            // Player let go of the stick, smoothly auto-center the head!
             currentManualYaw = Mathf.Lerp(currentManualYaw, 0f, Time.deltaTime * lookCenteringSpeed);
             currentManualPitch = Mathf.Lerp(currentManualPitch, 0f, Time.deltaTime * lookCenteringSpeed);
         }
 
-        // Stop the player from spinning their head 360 degrees like an owl
+        // Stop the player from spinning their head 360 degrees
         currentManualYaw = Mathf.Clamp(currentManualYaw, -maxLookYaw, maxLookYaw);
         currentManualPitch = Mathf.Clamp(currentManualPitch, -maxLookPitch, maxLookPitch);
 
