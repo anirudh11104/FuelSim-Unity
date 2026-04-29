@@ -54,7 +54,7 @@ public class BikeEngineSimulator : MonoBehaviour
 
 
 
-    float clutchInputRaw; // raw lever input (instant, not smoothed)
+    public float clutchInputRaw; // raw lever input (instant, not smoothed)
 
     public float brakeResponse = 5f; // Simulates hydraulic pressure buildup time
 

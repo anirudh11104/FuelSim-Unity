@@ -8,7 +8,8 @@ public class RealisticMotorcyclePOV : MonoBehaviour
 
     public BikeEngineSimulator vehicle;
 
-
+    private float surgeVelocity = 0f;
+    private float pitchVelocity = 0f;
 
     [Header("Camera Weight & Look")]
 
@@ -190,15 +191,16 @@ public class RealisticMotorcyclePOV : MonoBehaviour
 
         float targetAccelPitch = -speedChange * accelPitchMultiplier;
         targetAccelPitch = Mathf.Clamp(targetAccelPitch, -maxAccelPitch, maxAccelPitch);
-        smoothedAccelPitch = Mathf.Lerp(smoothedAccelPitch, targetAccelPitch, Time.deltaTime * accelSmoothness);
+        
 
         // NEW SURGE LOGIC: Explicitly mapping deceleration vs acceleration AND SPEED
         float targetSurgeZ = 0f;
 
         bool braking = vehicle.currentBrakeForce > 10f;
-        bool clutching = vehicle.clutch > 0.1f;
+        // FIX: Listen to your actual finger instantly, bypassing the mechanical engine clutch delay
+        bool clutching = vehicle.clutchInputRaw > 0.1f;
         bool accelerating = vehicle.throttle > 0.1f;
-        bool isMoving = vehicle.speed > 2f; // NEW: Only apply momentum effects if moving
+        bool isMoving = vehicle.speed > 2f;
 
         if (isMoving)
         {
@@ -216,22 +218,13 @@ public class RealisticMotorcyclePOV : MonoBehaviour
 
         targetSurgeZ = Mathf.Clamp(targetSurgeZ, -maxSurgeZ, maxSurgeZ);
 
-        // 🔥 FIX: DYNAMIC RECOVERY (Kills the delay)
-        float dynamicSmooth;
-        if (vehicle.speed < 5f)
-        {
-            dynamicSmooth = surgeSmoothness * 6f; // Instant snap at idle
-        }
-        else if (Mathf.Abs(targetSurgeZ) < 0.05f || targetSurgeZ < smoothedSurgeZ)
-        {
-            dynamicSmooth = surgeSmoothness * 3.5f; // Faster recovery when releasing levers
-        }
-        else
-        {
-            dynamicSmooth = surgeSmoothness; // Normal smooth entry into surge
-        }
+        // --- 2. MOMENTUM PHYSICS (SmoothDamp) ---
+        // This gives the camera "weight". It will naturally accelerate and settle.
+        // 0.12f is the time it takes to move. Higher = Heavier/Slower.
+        smoothedSurgeZ = Mathf.SmoothDamp(smoothedSurgeZ, targetSurgeZ, ref surgeVelocity, 0.12f);
 
-        smoothedSurgeZ = Mathf.Lerp(smoothedSurgeZ, targetSurgeZ, Time.deltaTime * dynamicSmooth);
+        // We also apply it to the G-Force Pitch (nodding forward/back)
+        smoothedAccelPitch = Mathf.SmoothDamp(smoothedAccelPitch, targetAccelPitch, ref pitchVelocity, 0.1f);
 
 
 
