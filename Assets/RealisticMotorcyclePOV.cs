@@ -151,43 +151,33 @@ public class RealisticMotorcyclePOV : MonoBehaviour
 
 
         // --- 1. MANUAL LOOK ---
+        float inputX = 0f;
+        float inputY = 0f;
 
-        float inputX = Input.GetAxis("RightStick X");
+        // FIX: Upgraded to the New Input System to match the BikeEngineSimulator.
+        if (UnityEngine.InputSystem.Gamepad.current != null)
+        {
+            inputX = UnityEngine.InputSystem.Gamepad.current.rightStick.x.ReadValue();
+            // We invert the Y axis so pushing up looks up, which is standard for first-person cameras.
+            inputY = -UnityEngine.InputSystem.Gamepad.current.rightStick.y.ReadValue();
+        }
 
-        float inputY = Input.GetAxis("RightStick Y");
-
-
-
+        // The deadzone (prevents stick drift)
         if (Mathf.Abs(inputX) < 0.15f) inputX = 0f;
-
         if (Mathf.Abs(inputY) < 0.15f) inputY = 0f;
 
-
-
         if (inputX != 0f || inputY != 0f)
-
         {
-
             currentManualYaw += inputX * lookSensitivity * 100f * Time.deltaTime;
-
             currentManualPitch += inputY * lookSensitivity * 100f * Time.deltaTime;
-
         }
-
         else
-
         {
-
             currentManualYaw = Mathf.Lerp(currentManualYaw, 0f, Time.deltaTime * lookCenteringSpeed);
-
             currentManualPitch = Mathf.Lerp(currentManualPitch, 0f, Time.deltaTime * lookCenteringSpeed);
-
         }
-
-
 
         currentManualYaw = Mathf.Clamp(currentManualYaw, -maxLookYaw, maxLookYaw);
-
         currentManualPitch = Mathf.Clamp(currentManualPitch, -maxLookPitch, maxLookPitch);
 
 
@@ -255,19 +245,20 @@ public class RealisticMotorcyclePOV : MonoBehaviour
 
 
 
-        // --- 4. LAYERED NOISE (Noticeable Idle Sway) ---
+        // --- 4. ORGANIC NOISE (Random Human Sway) ---
 
-        // FIX: Fade out the camera breathing wobble as speed increases so you don't feel disconnected from the world.
         float swayFade = Mathf.Clamp01(1f - (vehicle.speed / 15f));
-        float idleBreath = Mathf.Sin(Time.time * breathingSwaySpeed) * breathingSwayAmount * swayFade;
 
-        float swayX = idleBreath * 0.6f;
-        float swayY = idleBreath * 0.4f;
+        // FIX: Replaced the looping Sine wave with Perlin Noise for random, unpredictable movement.
+        // We feed it different offsets (100f and 200f) so the X and Y axes don't randomly move in the exact same direction.
+        float randomX = (Mathf.PerlinNoise(Time.time * breathingSwaySpeed, 100f) * 2f) - 1f;
+        float randomY = (Mathf.PerlinNoise(200f, Time.time * breathingSwaySpeed) * 2f) - 1f;
+
+        float swayX = randomX * breathingSwayAmount * swayFade * 0.6f;
+        float swayY = randomY * breathingSwayAmount * swayFade * 0.4f;
 
         Vector3 basePos = cameraMountPoint.position;
 
-        // FIX: Removed 'idleOffset' (the floating drone effect). 
-        // Camera stays locked to the mount, only surging forward/back with the clutch.
         Vector3 surge = yawOnly * new Vector3(0f, 0f, smoothedSurgeZ);
 
         transform.position = basePos + surge;
