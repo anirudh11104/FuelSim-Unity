@@ -545,7 +545,9 @@ public class BikeEngineSimulator : MonoBehaviour
 
 
 
-        if (currentGear == 0) transmittedTorque = 0f;
+        // FIX: If the engine is off, the clutch/transmission should not fight the wheels.
+        // This stops the 'shiver' when rolling with the ignition off.
+        if (currentGear == 0 || !engineRunning) transmittedTorque = 0f;
 
 
 
@@ -665,36 +667,24 @@ public class BikeEngineSimulator : MonoBehaviour
 
 
 
-        // --- BRAKE & COASTING PRIORITY ---
-
+        // --- IMPROVED COASTING & STALL PHYSICS ---
         if (currentBrakeForce > 10f)
-
         {
-
-            // If the brake is pressed, ignore the clutch and stop the bike!
-
-            rb.drag = 2.0f;
-
+            rb.drag = 2.0f; // Solid braking
         }
-
+        else if (!engineRunning)
+        {
+            // If the engine is off and in gear, it should be VERY hard to move (Engine compression)
+            // If in neutral (Gear 0), it should roll freely.
+            rb.drag = (currentGear == 0) ? 0.05f : 5.0f;
+        }
         else if (clutch > 0.9f)
-
         {
-
-            // If no brake, but clutch is pulled, glide smoothly.
-
-            rb.drag = 0.01f;
-
+            rb.drag = 0.01f; // Smooth glide
         }
-
         else
-
         {
-
-            // Normal engine behavior (Engine braking or driving).
-
             rb.drag = (throttle < 0.1f) ? 0.15f : 0.05f;
-
         }
 
 
