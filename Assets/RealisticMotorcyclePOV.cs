@@ -257,37 +257,20 @@ public class RealisticMotorcyclePOV : MonoBehaviour
 
         // --- 4. LAYERED NOISE (Noticeable Idle Sway) ---
 
-        float idleBreath = Mathf.Sin(Time.time * breathingSwaySpeed) * breathingSwayAmount;
-
-
+        // FIX: Fade out the camera breathing wobble as speed increases so you don't feel disconnected from the world.
+        float swayFade = Mathf.Clamp01(1f - (vehicle.speed / 15f));
+        float idleBreath = Mathf.Sin(Time.time * breathingSwaySpeed) * breathingSwayAmount * swayFade;
 
         float swayX = idleBreath * 0.6f;
-
         float swayY = idleBreath * 0.4f;
-
-
-
-        Vector3 idleOffset = new Vector3(
-
-    Mathf.Sin(Time.time * 0.6f) * 0.015f,
-
-    Mathf.Sin(Time.time * 0.9f) * 0.02f,
-
-    Mathf.Sin(Time.time * 0.5f) * 0.01f   // add slight Z breathing
-
-);
 
         Vector3 basePos = cameraMountPoint.position;
 
-
-
+        // FIX: Removed 'idleOffset' (the floating drone effect). 
+        // Camera stays locked to the mount, only surging forward/back with the clutch.
         Vector3 surge = yawOnly * new Vector3(0f, 0f, smoothedSurgeZ);
 
-        Vector3 idle = yawOnly * idleOffset;
-
-
-
-        transform.position = basePos + surge + idle;
+        transform.position = basePos + surge;
 
 
 
