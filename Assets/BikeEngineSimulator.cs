@@ -279,10 +279,13 @@ public class BikeEngineSimulator : MonoBehaviour
 
 
         if (Input.GetKeyDown(KeyCode.R))
-
             starterPressed = true;
 
-
+        // THE FIX: Completely kill the throttle input if the engine is off!
+        if (!engineRunning)
+        {
+            throttleInput = 0f;
+        }
 
         throttle = Mathf.Lerp(throttle, throttleInput, Time.deltaTime * throttleResponse);
 

@@ -220,9 +220,8 @@ public class RealisticMotorcyclePOV : MonoBehaviour
         }
         else
         {
-            // At idle, releasing the clutch does nothing. Only revving pushes you back slightly.
-            if (accelerating) targetSurgeZ = -vehicle.throttle * maxSurgeZ * 0.2f;
-            else targetSurgeZ = 0f;
+            // FIX: Zero movement at idle. Revving the throttle while parked no longer pushes the camera backward.
+            targetSurgeZ = 0f;
         }
 
         targetSurgeZ = Mathf.Clamp(targetSurgeZ, -maxSurgeZ, maxSurgeZ);
