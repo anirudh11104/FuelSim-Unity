@@ -680,7 +680,7 @@ public class BikeEngineSimulator : MonoBehaviour
         }
         else if (clutch > 0.9f)
         {
-            rb.drag = 0.01f; // Smooth glide
+            rb.drag = 0.05f; // Smooth glide
         }
         else
         {
@@ -742,31 +742,20 @@ public class BikeEngineSimulator : MonoBehaviour
         }
 
         else
-
         {
-
             // Stand up straight when stopped
-
             Vector3 currentEuler = rb.rotation.eulerAngles;
-
             Quaternion upright = Quaternion.Euler(currentEuler.x, currentEuler.y, 0f);
-
             rb.MoveRotation(Quaternion.Slerp(rb.rotation, upright, Time.fixedDeltaTime * 5f));
 
-
-
-            // THE PARKING BRAKE
-
-            if (throttle < 0.1f && clutch < 0.5f) // Only park if throttle is 0 AND clutch is out
-
+            // THE UPGRADED PARKING BRAKE
+            // If we are applying zero throttle and moving extremely slowly, just lock it down.
+            // This stops the 'Pendulum Trick' from causing ghost drift when the clutch is pulled.
+            if (throttle < 0.05f && rb.velocity.magnitude < 1.5f)
             {
-
                 rb.velocity = new Vector3(0, rb.velocity.y, 0);
-
-                rb.angularVelocity *= 0.2f;
-
+                rb.angularVelocity = Vector3.zero;
             }
-
         }
 
 
