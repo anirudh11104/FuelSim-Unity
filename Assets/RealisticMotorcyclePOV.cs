@@ -122,7 +122,7 @@ public class RealisticMotorcyclePOV : MonoBehaviour
         currentShiftPitch = Mathf.Lerp(currentShiftPitch, 0f, Time.deltaTime * pitchRecoverySpeed);
 
         // --- 4. ORGANIC NOISE & APEX LOOK ---
-        float swayFade = Mathf.Clamp01(1f - (vehicle.speed / 15f));
+        float swayFade = 1f;
         float randomX = (Mathf.PerlinNoise(Time.time * breathingSwaySpeed, 100f) * 2f) - 1f;
         float randomY = (Mathf.PerlinNoise(200f, Time.time * breathingSwaySpeed) * 2f) - 1f;
 
