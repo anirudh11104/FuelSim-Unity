@@ -93,10 +93,30 @@ public class RealisticMotorcyclePOV : MonoBehaviour
         currentManualPitch = Mathf.Clamp(currentManualPitch, -maxLookPitch, maxLookPitch);
 
         // --- 3. SURGE & G-FORCE PITCH ---
-        float speedChange = (vehicle.speed - lastSpeed) / Time.deltaTime;
-        lastSpeed = vehicle.speed;
+        // --- 2. G-FORCE PITCH (THE "FAKE IT" FIX) ---
+        // We decouple the camera pitch from the rigid body's physical speed.
+        // Instead, we calculate implied G-Force using smooth analog inputs. 
+        // This guarantees 0% vibration, even in 1st gear.
 
-        float targetAccelPitch = -speedChange * accelPitchMultiplier;
+        // These fake multipliers replace your physical gear ratios for the camera's feeling
+        float[] gearGForce = { 0f, 15f, 10f, 7f, 4f, 2f };
+        int safeGear = Mathf.Clamp(vehicle.currentGear, 0, 5);
+
+        // The torque fades out as the engine reaches redline, so the G-force should too
+        float rpmFactor = Mathf.Clamp01(1f - (vehicle.rpm / vehicle.maxRPM));
+
+        // If the clutch is pulled, the engine is disconnected and provides zero G-force
+        float clutchEngagement = 1f - vehicle.clutch;
+
+        // Calculate the smooth backward pitch
+        float targetAccelPitch = -vehicle.throttle * gearGForce[safeGear] * rpmFactor * clutchEngagement * accelPitchMultiplier;
+
+        // Add the forward dive for braking
+        if (vehicle.currentBrakeForce > 10f)
+        {
+            targetAccelPitch = 10f;
+        }
+
         targetAccelPitch = Mathf.Clamp(targetAccelPitch, -maxAccelPitch, maxAccelPitch);
 
         float targetSurgeZ = 0f;
