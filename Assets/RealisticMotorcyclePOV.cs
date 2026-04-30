@@ -1,169 +1,80 @@
 ﻿using UnityEngine;
-
-
+using UnityEngine.InputSystem;
 
 public class RealisticMotorcyclePOV : MonoBehaviour
-
 {
-
     public BikeEngineSimulator vehicle;
+    public Transform cameraMountPoint;
+    public Transform bikeTransform;
 
     private float surgeVelocity = 0f;
     private float pitchVelocity = 0f;
-
-    [Header("Camera Weight & Look")]
-
-    public float neckStiffness = 3f;
-
-
-
-    [Header("Manual Look (Right Stick)")]
-
-    public float lookSensitivity = 2f;
-
-    public float maxLookYaw = 40f;
-
-    public float maxLookPitch = 20f;
-
-    public Transform bikeTransform;
-
-    public Transform cameraMountPoint;
-
-    public float lookCenteringSpeed = 4f;
-
-
-
-    [Header("Apex Look (Auto-Looking into turns)")]
-
-    public float apexLookMultiplier = 0.6f;
-
-
-
-    [Header("Body Surge (The Clutch/Brake Effect)")]
-
-
-
-    public float maxSurgeZ = 0.25f; // Increased so you can really see it move
-
-    public float surgeSmoothness = 8f;
-
-
-
-    [Header("Acceleration & Braking (G-Force Pitch)")]
-
-    public float accelPitchMultiplier = 0.8f;
-
-    public float maxAccelPitch = 12f;
-
-    public float accelSmoothness = 5f;
-
-
-
-    [Header("Inertia & Gear Shifts")]
-
-    public float shiftPitchIntensity = 8f;
-
-    public float pitchRecoverySpeed = 5f;
-
-
-
-    [Header("Idle Camera Sway (Noticeable Breathing)")]
-
-    public float maxMicroJitter = 0.6f;
-
-    public float microJitterSpeed = 25f;
-
-    public float breathingSwayAmount = 4f; // Cranked up for noticeable idle movement
-
-    public float breathingSwaySpeed = 1.2f;  // Breathes faster
-
-
-
-    [Header("Horizon Lock")]
-
-    [Range(0f, 1f)]
-
-    public float headTiltMultiplier = 0.15f;
-
-
-
-    // Internal trackers
-
-    private int lastGear;
-
-    private float lastSpeed;
-
-    public Vector3 cameraOffset = new Vector3(0f, 1.6f, 0.2f);
-
-    private float currentShiftPitch = 0f;
-
-
-
-    private float smoothedAccelPitch = 0f;
-
-    private float smoothedSurgeZ = 0f;
-
-    private float smoothedBikeLean = 0f;
-
     private float bikeLeanVelocity = 0f;
 
-    private float currentManualYaw = 0f;
+    [Header("Manual Look (Right Stick)")]
+    public float lookSensitivity = 2f;
+    public float maxLookYaw = 40f;
+    public float maxLookPitch = 20f;
+    public float lookCenteringSpeed = 4f;
 
+    [Header("Apex Look (Auto-Looking into turns)")]
+    public float apexLookMultiplier = 0.6f;
+
+    [Header("Body Surge (The Clutch/Brake Effect)")]
+    public float maxSurgeZ = 0.25f;
+    public float surgeSmoothness = 8f;
+
+    [Header("Acceleration & Braking (G-Force Pitch)")]
+    public float accelPitchMultiplier = 0.8f;
+    public float maxAccelPitch = 12f;
+    public float accelSmoothness = 5f;
+
+    [Header("Inertia & Gear Shifts")]
+    public float shiftPitchIntensity = 8f;
+    public float pitchRecoverySpeed = 5f;
+
+    [Header("Idle Camera Sway (Noticeable Breathing)")]
+    public float maxMicroJitter = 0.6f;
+    public float breathingSwayAmount = 4f;
+    public float breathingSwaySpeed = 1.2f;
+
+    // Internal trackers
+    private float lastSpeed;
+    private float currentShiftPitch = 0f;
+    private float smoothedAccelPitch = 0f;
+    private float smoothedSurgeZ = 0f;
+    private float smoothedBikeLean = 0f;
+    private float currentManualYaw = 0f;
     private float currentManualPitch = 0f;
 
-    Quaternion yawOnly;
-
-    float smoothedYaw = 0f;
-
-    private Vector3 baseLocalPosition;
-
-
-
     void Start()
-
     {
-
         if (vehicle != null)
-
         {
-
-            lastGear = vehicle.currentGear;
-
             lastSpeed = vehicle.speed;
-
         }
-
-        baseLocalPosition = transform.localPosition;
-
-        smoothedYaw = Mathf.Atan2(bikeTransform.forward.x, bikeTransform.forward.z) * Mathf.Rad2Deg;
-
     }
 
-
-
     void LateUpdate()
-
     {
+        if (vehicle == null || cameraMountPoint == null) return;
 
-        yawOnly = Quaternion.Euler(0f, bikeTransform.eulerAngles.y, 0f);
+        // --- 1. THE JITTER KILLER (Absolute Tracking) ---
+        // We read the perfectly interpolated Rigidbody mount point directly. 
+        // No Slerps, no SmoothDamps on the world tracking.
+        Vector3 basePosition = cameraMountPoint.position;
+        Quaternion baseRotation = cameraMountPoint.rotation;
 
-        if (vehicle == null) return;
-
-
-
-        // --- 1. MANUAL LOOK ---
+        // --- 2. MANUAL LOOK ---
         float inputX = 0f;
         float inputY = 0f;
 
-        // FIX: Upgraded to the New Input System to match the BikeEngineSimulator.
-        if (UnityEngine.InputSystem.Gamepad.current != null)
+        if (Gamepad.current != null)
         {
-            inputX = UnityEngine.InputSystem.Gamepad.current.rightStick.x.ReadValue();
-            // We invert the Y axis so pushing up looks up, which is standard for first-person cameras.
-            inputY = -UnityEngine.InputSystem.Gamepad.current.rightStick.y.ReadValue();
+            inputX = Gamepad.current.rightStick.x.ReadValue();
+            inputY = -Gamepad.current.rightStick.y.ReadValue();
         }
 
-        // The deadzone (prevents stick drift)
         if (Mathf.Abs(inputX) < 0.15f) inputX = 0f;
         if (Mathf.Abs(inputY) < 0.15f) inputY = 0f;
 
@@ -181,23 +92,15 @@ public class RealisticMotorcyclePOV : MonoBehaviour
         currentManualYaw = Mathf.Clamp(currentManualYaw, -maxLookYaw, maxLookYaw);
         currentManualPitch = Mathf.Clamp(currentManualPitch, -maxLookPitch, maxLookPitch);
 
-
-
-
-
-        // --- 2. G-FORCE PITCH & MASSIVE BODY SURGE (Z-Shift) ---
+        // --- 3. SURGE & G-FORCE PITCH ---
         float speedChange = (vehicle.speed - lastSpeed) / Time.deltaTime;
         lastSpeed = vehicle.speed;
 
         float targetAccelPitch = -speedChange * accelPitchMultiplier;
         targetAccelPitch = Mathf.Clamp(targetAccelPitch, -maxAccelPitch, maxAccelPitch);
-        
 
-        // NEW SURGE LOGIC: Explicitly mapping deceleration vs acceleration AND SPEED
         float targetSurgeZ = 0f;
-
         bool braking = vehicle.currentBrakeForce > 10f;
-        // FIX: Listen to your actual finger instantly, bypassing the mechanical engine clutch delay
         bool clutching = vehicle.clutchInputRaw > 0.1f;
         bool accelerating = vehicle.throttle > 0.1f;
         bool isMoving = vehicle.speed > 2f;
@@ -206,138 +109,48 @@ public class RealisticMotorcyclePOV : MonoBehaviour
         {
             if (braking && !clutching) targetSurgeZ = maxSurgeZ;
             else if (braking && clutching) targetSurgeZ = 0.8f * maxSurgeZ;
-            else if (!accelerating && !clutching) targetSurgeZ = 0.6f * maxSurgeZ; // Engine braking
-            else if (clutching && !braking) targetSurgeZ = 0.2f * maxSurgeZ; // Reduced from 0.3
+            else if (!accelerating && !clutching) targetSurgeZ = 0.6f * maxSurgeZ;
+            else if (clutching && !braking) targetSurgeZ = 0.2f * maxSurgeZ;
             else if (accelerating) targetSurgeZ = -vehicle.throttle * maxSurgeZ * 0.6f;
-        }
-        else
-        {
-            // FIX: Zero movement at idle. Revving the throttle while parked no longer pushes the camera backward.
-            targetSurgeZ = 0f;
         }
 
         targetSurgeZ = Mathf.Clamp(targetSurgeZ, -maxSurgeZ, maxSurgeZ);
 
-        // --- 2. MOMENTUM PHYSICS (SmoothDamp) ---
-        // This gives the camera "weight". It will naturally accelerate and settle.
-        // 0.12f is the time it takes to move. Higher = Heavier/Slower.
+        // Smooth the INTERNAL numbers, not the camera transform
         smoothedSurgeZ = Mathf.SmoothDamp(smoothedSurgeZ, targetSurgeZ, ref surgeVelocity, 0.12f);
-
-        // We also apply it to the G-Force Pitch (nodding forward/back)
         smoothedAccelPitch = Mathf.SmoothDamp(smoothedAccelPitch, targetAccelPitch, ref pitchVelocity, 0.1f);
-
-
-
-        // --- 3. INERTIA PUNCH (Gear Shifts) ---
-
-
-
         currentShiftPitch = Mathf.Lerp(currentShiftPitch, 0f, Time.deltaTime * pitchRecoverySpeed);
 
-
-
-
-
-        // --- 4. ORGANIC NOISE (Random Human Sway) ---
-
+        // --- 4. ORGANIC NOISE & APEX LOOK ---
         float swayFade = Mathf.Clamp01(1f - (vehicle.speed / 15f));
-
-        // FIX: Replaced the looping Sine wave with Perlin Noise for random, unpredictable movement.
-        // We feed it different offsets (100f and 200f) so the X and Y axes don't randomly move in the exact same direction.
         float randomX = (Mathf.PerlinNoise(Time.time * breathingSwaySpeed, 100f) * 2f) - 1f;
         float randomY = (Mathf.PerlinNoise(200f, Time.time * breathingSwaySpeed) * 2f) - 1f;
 
         float swayX = randomX * breathingSwayAmount * swayFade * 0.6f;
         float swayY = randomY * breathingSwayAmount * swayFade * 0.4f;
 
-        Vector3 basePos = cameraMountPoint.position;
-
-        Vector3 surge = yawOnly * new Vector3(0f, 0f, smoothedSurgeZ);
-
-        transform.position = basePos + surge;
-
-
-
-        float speedFactor = Mathf.Clamp01(vehicle.speed / 120f);
-
-        float currentJitter = Mathf.Lerp(0.01f, maxMicroJitter * 0.5f, speedFactor);
-
-
-
-        float jitterX = 0f;
-
-        float jitterY = 0f;
-
-
-
-
-
-        // --- 5. HORIZON LOCK & APEX LOOK ---
-
         float currentBikeLean = 0f;
-
         if (bikeTransform != null)
-
         {
-
-            Vector3 localEuler = bikeTransform.localEulerAngles;
-
-            float rawLean = localEuler.z;
-
+            float rawLean = bikeTransform.localEulerAngles.z;
             if (rawLean > 180f) rawLean -= 360f;
-
             currentBikeLean = rawLean;
-
         }
 
-
-
-
-
-
-
-        smoothedBikeLean = Mathf.SmoothDamp(
-
-        smoothedBikeLean,
-
-        currentBikeLean,
-
-        ref bikeLeanVelocity,
-
-        0.08f
-
-    );
-
-
-
-
+        smoothedBikeLean = Mathf.SmoothDamp(smoothedBikeLean, currentBikeLean, ref bikeLeanVelocity, 0.08f);
         float apexYaw = smoothedBikeLean * apexLookMultiplier;
 
+        // --- 5. APPLY EVERYTHING AS LOCAL OFFSETS ---
+        float finalPitch = smoothedAccelPitch + swayX + currentManualPitch;
+        float finalYaw = swayY + currentManualYaw + apexYaw;
 
+        // Calculate final position by moving locally forward/backward along the mount's Z axis
+        Vector3 finalPosition = basePosition + (baseRotation * new Vector3(0f, 0f, smoothedSurgeZ));
 
+        // Calculate final rotation by applying our effects ON TOP of the mount's rigid rotation
+        Quaternion finalRotation = baseRotation * Quaternion.Euler(finalPitch, finalYaw, 0f);
 
-
-        // --- 6. APPLY FINAL ROTATION ---
-        float finalPitch = smoothedAccelPitch + swayX + jitterX + currentManualPitch;
-        float finalYaw = swayY + jitterY + currentManualYaw + apexYaw;
-
-        // FIX: Removed the double-yaw math entirely. 
-        // cameraMountPoint ALREADY knows which way the bike is facing.
-        Quaternion baseRotation = cameraMountPoint.rotation;
-
-        // Apply our custom pitch and sway on top of the mount's world rotation
-        Quaternion targetRotation = baseRotation * Quaternion.Euler(finalPitch, finalYaw, 0f);
-
-        // The neckStiffness Slerp handles all the smoothing we need naturally
-        Quaternion desiredRotation = Quaternion.Slerp(
-            transform.rotation,
-            targetRotation,
-            Time.deltaTime * neckStiffness * 1.5f
-        );
-
-        transform.rotation = desiredRotation;
-
+        transform.position = finalPosition;
+        transform.rotation = finalRotation;
     }
-
 }
-
