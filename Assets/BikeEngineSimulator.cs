@@ -157,7 +157,7 @@ public class BikeEngineSimulator : MonoBehaviour
     void Update()
 
     {
-
+        if (Time.timeScale == 0f) return;
         HandleInput();
 
         TryStarterMotor();
