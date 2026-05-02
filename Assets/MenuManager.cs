@@ -89,6 +89,7 @@ public class MenuManager : MonoBehaviour
         CloseAllPanels();
         mainMenuPanel.SetActive(true);
         EventSystem.current.SetSelectedGameObject(null);
+        if (hudCanvas != null) hudCanvas.SetActive(false);
     }
 
     public void ShowVehicleSelect()
