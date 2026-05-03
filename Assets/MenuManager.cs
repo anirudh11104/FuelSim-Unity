@@ -18,6 +18,10 @@ public class MenuManager : MonoBehaviour
     public GameObject settingsFirstOption;
     public GameObject pauseResumeButton;
 
+    [Header("Vehicles")]
+    public GameObject motorcyclePlayer;
+    public GameObject carPlayer;
+
     private bool isPaused = false;
     private bool inMainMenu = true;
 
@@ -107,6 +111,20 @@ public class MenuManager : MonoBehaviour
     }
 
     // --- GAMEPLAY STATE ---
+
+    public void PlayAsCar()
+    {
+        motorcyclePlayer.SetActive(false);
+        carPlayer.SetActive(true);
+        StartGame(); // This will close the menus and unpause the game!
+    }
+
+    public void PlayAsMotorcycle()
+    {
+        carPlayer.SetActive(false);
+        motorcyclePlayer.SetActive(true);
+        StartGame(); // This will close the menus and unpause the game!
+    }
 
     public void StartGame()
     {

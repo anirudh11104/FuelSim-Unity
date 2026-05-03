@@ -155,17 +155,29 @@ public class BikeEngineSimulator : MonoBehaviour
     // ================= UPDATE (Inputs & State) =================
 
     void Update()
-
     {
-        if (Time.timeScale == 0f) return;
+        // THE FIX: Explicitly kill the rumble right before freezing the script
+        if (Time.timeScale == 0f)
+        {
+            if (Gamepad.current != null)
+            {
+                Gamepad.current.SetMotorSpeeds(0f, 0f);
+            }
+            return;
+        }
+
         HandleInput();
-
         TryStarterMotor();
-
         TryPushStart();
-
     }
 
+    void OnDisable()
+    {
+        if (Gamepad.current != null)
+        {
+            Gamepad.current.SetMotorSpeeds(0f, 0f);
+        }
+    }
 
 
     // ================= FIXED UPDATE (Physics Only) =================
