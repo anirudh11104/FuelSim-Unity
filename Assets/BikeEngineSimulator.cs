@@ -72,7 +72,7 @@ public class BikeEngineSimulator : MonoBehaviour
 
     // TOTAL reduction ratios (Primary Drive * Gearbox * Final Drive)
 
-    float[] gearRatios = { 0f, 12.5f, 9.0f, 7.0f, 5.5f, 4.5f };
+    float[] gearRatios = { 0f, 12.5f, 9.0f, 7.0f, 5.5f, 4.5f, 3.8f };
 
 
 
@@ -520,28 +520,23 @@ public class BikeEngineSimulator : MonoBehaviour
 
 
         // ---------------- CLUTCH ----------------
-
         float engagement = Mathf.Clamp01(1f - clutch);
-
         float currentClutchCapacity = maxClutchTorque * engagement;
 
-
-
         float transmissionRadS = wheelRadS * gearRatio;
-
         float slipSpeed = engineRadS - transmissionRadS;
 
-
-
-        float transmittedTorque = slipSpeed * clutchStiffness * engagement;
-
+        // Bumping up the clutch stiffness from 30 to 100 makes it "bite" like a real aggressive GT 650
+        float activeClutchStiffness = 100f;
+        float transmittedTorque = slipSpeed * activeClutchStiffness * engagement;
         transmittedTorque = Mathf.Clamp(transmittedTorque, -currentClutchCapacity, currentClutchCapacity);
 
-
-
-        float maxSyncTorque = (Mathf.Abs(slipSpeed) / Time.fixedDeltaTime) * engineInertia;
-
+        // THE FIX: We MUST add totalEngineTorque so the combustion power is allowed to pass through!
+        float maxSyncTorque = ((Mathf.Abs(slipSpeed) / Time.fixedDeltaTime) * engineInertia) + Mathf.Abs(totalEngineTorque);
         transmittedTorque = Mathf.Clamp(transmittedTorque, -maxSyncTorque, maxSyncTorque);
+
+        // If the engine is off, the clutch/transmission should not fight the wheels.
+        if (currentGear == 0 || !engineRunning) transmittedTorque = 0f;
 
 
 
@@ -674,16 +669,18 @@ public class BikeEngineSimulator : MonoBehaviour
         }
         else if (!engineRunning)
         {
-            // If the engine is off and in gear, it should be VERY hard to move (Engine compression)
-            // If in neutral (Gear 0), it should roll freely.
-            rb.drag = (currentGear == 0) ? 0.05f : 5.0f;
+            // If the engine is off and in gear, engine braking locks the wheel
+            // If in neutral (Gear 0), it rolls freely like a bicycle.
+            rb.drag = (currentGear == 0) ? 0.005f : 5.0f;
         }
-        else if (clutch > 0.9f)
+        else if (clutch > 0.8f) // Lowered the threshold slightly so it triggers sooner
         {
-            rb.drag = 0.05f; // Smooth glide
+            rb.drag = 0.005f; // THE FIX: Dropped from 0.05f. Pure, frictionless gliding!
         }
         else
         {
+            // Engine braking when off throttle. 
+            // CRUCIAL: The acceleration drag MUST be 0.05f to maintain the realistic 165 km/h cap!
             rb.drag = (throttle < 0.1f) ? 0.15f : 0.05f;
         }
 

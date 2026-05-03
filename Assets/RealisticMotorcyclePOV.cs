@@ -114,7 +114,11 @@ public class RealisticMotorcyclePOV : MonoBehaviour
         // Add the forward dive for braking
         if (vehicle.currentBrakeForce > 10f)
         {
-            targetAccelPitch = 10f;
+            // Calculate a multiplier from 0.0 to 1.0 based on how fast the bike is physically rolling
+            float speedFactor = Mathf.Clamp01(vehicle.speed / 10f);
+
+            // Multiply the dive angle by the speed factor so it sits at 0 when parked
+            targetAccelPitch = 10f * speedFactor;
         }
 
         targetAccelPitch = Mathf.Clamp(targetAccelPitch, -maxAccelPitch, maxAccelPitch);
