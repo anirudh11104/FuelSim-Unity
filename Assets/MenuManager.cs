@@ -10,7 +10,7 @@ public class MenuManager : MonoBehaviour
     public GameObject vehicleSelectPanel;
     public GameObject settingsPanel;
     public GameObject pauseMenuPanel;
-    public GameObject hudCanvas; // Your dashboard canvas (optional)
+    public GameObject hudCanvas;
 
     [Header("First Selected (For Gamepad)")]
     public GameObject mainPlayButton;
@@ -28,7 +28,6 @@ public class MenuManager : MonoBehaviour
 
     void Start()
     {
-        // When the game boots up, freeze time and show the Main Menu
         ShowMainMenu();
     }
 
@@ -41,10 +40,9 @@ public class MenuManager : MonoBehaviour
 
         if (pauseInput && !inMainMenu)
         {
-            // THE FIX: Only allow a pause toggle if 0.25 real-time seconds have passed
             if (Time.unscaledTime - lastPauseTime > 0.25f)
             {
-                lastPauseTime = Time.unscaledTime; // Record the exact time we pressed it
+                lastPauseTime = Time.unscaledTime;
 
                 if (isPaused) ResumeGame();
                 else PauseGame();
@@ -54,33 +52,37 @@ public class MenuManager : MonoBehaviour
         // --- BACK LOGIC ('B' Button) ---
         if (Gamepad.current != null && Gamepad.current.buttonEast.wasPressedThisFrame)
         {
-            // If we are in settings, go back to where we came from
             if (settingsPanel.activeSelf)
             {
                 if (inMainMenu) ShowMainMenu();
                 else PauseGame();
             }
-            // If in vehicle select, go back to main menu
             else if (vehicleSelectPanel.activeSelf) ShowMainMenu();
-            // If in pause menu, just resume the game
             else if (pauseMenuPanel.activeSelf) ResumeGame();
         }
 
+        // --- INVISIBLE UI WAKE-UP LOGIC ---
+        // Keeps the box hidden until you move the stick, but instantly catches the very first movement!
         if (EventSystem.current.currentSelectedGameObject == null)
         {
+            bool wakeUp = false;
+
             if (Gamepad.current != null)
             {
-                // Check if you bump the Left Stick, Right Stick, or D-pad
-                if (Gamepad.current.leftStick.ReadValue().magnitude > 0.5f ||
-                    Gamepad.current.rightStick.ReadValue().magnitude > 0.5f ||
-                    Gamepad.current.dpad.ReadValue().magnitude > 0.5f)
+                // The threshold is now 0.1f. The tiniest flick will wake it up on the first try.
+                if (Gamepad.current.leftStick.ReadValue().magnitude > 0.1f ||
+                    Gamepad.current.dpad.ReadValue().magnitude > 0.1f)
                 {
-                    // Snap the neon box to the correct active menu
-                    if (mainMenuPanel.activeSelf) SetSelected(mainPlayButton);
-                    else if (vehicleSelectPanel.activeSelf) SetSelected(vehicleMotorcycleButton);
-                    else if (settingsPanel.activeSelf) SetSelected(settingsFirstOption);
-                    else if (pauseMenuPanel.activeSelf) SetSelected(pauseResumeButton);
+                    wakeUp = true;
                 }
+            }
+
+            if (wakeUp)
+            {
+                if (mainMenuPanel.activeSelf) SetSelected(mainPlayButton);
+                else if (vehicleSelectPanel.activeSelf) SetSelected(vehicleMotorcycleButton);
+                else if (settingsPanel.activeSelf) SetSelected(settingsFirstOption);
+                else if (pauseMenuPanel.activeSelf) SetSelected(pauseResumeButton);
             }
         }
     }
@@ -90,15 +92,17 @@ public class MenuManager : MonoBehaviour
     public void ShowMainMenu()
     {
         inMainMenu = true;
+        isPaused = false; // Reset pause state just to be safe
         Time.timeScale = 0f;
         AudioListener.pause = true;
 
-        // Globally cuts power to the controller's vibration motors
         InputSystem.PauseHaptics();
         if (Gamepad.current != null) Gamepad.current.SetMotorSpeeds(0f, 0f);
 
         CloseAllPanels();
         mainMenuPanel.SetActive(true);
+
+        // Hide the box initially
         EventSystem.current.SetSelectedGameObject(null);
         if (hudCanvas != null) hudCanvas.SetActive(false);
     }
@@ -117,18 +121,10 @@ public class MenuManager : MonoBehaviour
         EventSystem.current.SetSelectedGameObject(null);
     }
 
-    // --- NEW: Smart UI Back Button Logic ---
     public void BackFromSettings()
     {
-        // Check our state to see where we came from
-        if (inMainMenu)
-        {
-            ShowMainMenu();
-        }
-        else
-        {
-            PauseGame(); // This brings the pause menu back up!
-        }
+        if (inMainMenu) ShowMainMenu();
+        else PauseGame();
     }
 
     // --- GAMEPLAY STATE ---
@@ -137,9 +133,7 @@ public class MenuManager : MonoBehaviour
     {
         motorcyclePlayer.SetActive(false);
         carPlayer.SetActive(true);
-
-        ActiveVehicle.Current = carPlayer; // 👈 ADD THIS LINE
-
+        ActiveVehicle.Current = carPlayer;
         StartGame();
     }
 
@@ -147,15 +141,14 @@ public class MenuManager : MonoBehaviour
     {
         carPlayer.SetActive(false);
         motorcyclePlayer.SetActive(true);
-
-        ActiveVehicle.Current = motorcyclePlayer; // 👈 ADD THIS LINE
-
+        ActiveVehicle.Current = motorcyclePlayer;
         StartGame();
     }
 
     public void StartGame()
     {
         inMainMenu = false;
+        isPaused = false; // THE FIX: Forgets the old pause state when you start driving!
         StartCoroutine(EnableGameplayAfterDelay());
     }
 
@@ -165,14 +158,14 @@ public class MenuManager : MonoBehaviour
         Time.timeScale = 0f;
         AudioListener.pause = true;
 
-        // Globally cuts power to the controller's vibration motors
         InputSystem.PauseHaptics();
         if (Gamepad.current != null) Gamepad.current.SetMotorSpeeds(0f, 0f);
 
         CloseAllPanels();
         pauseMenuPanel.SetActive(true);
-        EventSystem.current.SetSelectedGameObject(null);
 
+        // Hide the box initially
+        EventSystem.current.SetSelectedGameObject(null);
         if (hudCanvas != null) hudCanvas.SetActive(false);
     }
 
@@ -184,15 +177,11 @@ public class MenuManager : MonoBehaviour
 
     private IEnumerator EnableGameplayAfterDelay()
     {
-        // 1. Hide the menus immediately so the UI feels snappy and responsive
         CloseAllPanels();
         if (hudCanvas != null) hudCanvas.SetActive(true);
 
-        // 2. Force the game to wait 0.15 seconds in real-time. 
-        // This gives the player time to lift their thumb off the 'A' button!
         yield return new WaitForSecondsRealtime(0.15f);
 
-        // 3. Now that the button is released, it is safe to unfreeze physics and turn the audio on
         Time.timeScale = 1f;
         AudioListener.pause = false;
         InputSystem.ResumeHaptics();
@@ -200,7 +189,6 @@ public class MenuManager : MonoBehaviour
 
     public void QuitToDesktop()
     {
-        Debug.Log("Quitting Game...");
         Application.Quit();
     }
 
@@ -216,17 +204,12 @@ public class MenuManager : MonoBehaviour
 
     private void SetSelected(GameObject firstButton)
     {
-        // Clear the current memory, then forcefully select the new button so the joystick works
         EventSystem.current.SetSelectedGameObject(null);
         EventSystem.current.SetSelectedGameObject(firstButton);
     }
 
     void OnApplicationQuit()
     {
-        // Failsafe: Shut off motors when you exit Play Mode or quit the game
-        if (Gamepad.current != null)
-        {
-            Gamepad.current.SetMotorSpeeds(0f, 0f);
-        }
+        if (Gamepad.current != null) Gamepad.current.SetMotorSpeeds(0f, 0f);
     }
 }
