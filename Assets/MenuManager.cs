@@ -24,6 +24,7 @@ public class MenuManager : MonoBehaviour
 
     private bool isPaused = false;
     private bool inMainMenu = true;
+    private float lastPauseTime = 0f;
 
     void Start()
     {
@@ -40,8 +41,14 @@ public class MenuManager : MonoBehaviour
 
         if (pauseInput && !inMainMenu)
         {
-            if (isPaused) ResumeGame();
-            else PauseGame();
+            // THE FIX: Only allow a pause toggle if 0.25 real-time seconds have passed
+            if (Time.unscaledTime - lastPauseTime > 0.25f)
+            {
+                lastPauseTime = Time.unscaledTime; // Record the exact time we pressed it
+
+                if (isPaused) ResumeGame();
+                else PauseGame();
+            }
         }
 
         // --- BACK LOGIC ('B' Button) ---

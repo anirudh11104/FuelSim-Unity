@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections;
 using UnityEngine.InputSystem;
-using TMPro;
 
 public class DashboardController : MonoBehaviour
 {
@@ -9,8 +8,7 @@ public class DashboardController : MonoBehaviour
     public RectTransform speedNeedle;
     public RectTransform rpmNeedle;
 
-    [Header("Digital Displays")]
-    public TextMeshProUGUI gearText;
+    // (Gear text removed so it doesn't fight your new GearDisplay.cs script)
 
     [Header("Speedometer Settings")]
     public float speedMinAngle = 140f;
@@ -36,11 +34,9 @@ public class DashboardController : MonoBehaviour
     private float rpmVelocity;
     private bool wasGamepadConnected = false;
 
-    private BikeEngineSimulator bike;
-    private CarEngineSimulator car;
-
     void Update()
     {
+        // 1. Gamepad Sweep Animation Logic
         bool isGamepadConnected = Gamepad.current != null;
         if (isGamepadConnected && !wasGamepadConnected)
         {
@@ -49,42 +45,41 @@ public class DashboardController : MonoBehaviour
         }
         wasGamepadConnected = isGamepadConnected;
 
-        if (isStartingUp || ActiveVehicle.Current == null) return;
+        // If the sweep animation is running, ignore the engine data for a second
+        if (isStartingUp) return;
 
-        bike = ActiveVehicle.Current.GetComponent<BikeEngineSimulator>();
-        car = ActiveVehicle.Current.GetComponent<CarEngineSimulator>();
+        // 2. THE FIX: Dynamically find whichever vehicle is active right now
+        var car = FindFirstObjectByType<CarEngineSimulator>();
+        var bike = FindFirstObjectByType<BikeEngineSimulator>();
 
         float speed = 0f;
         float rpm = 0f;
-        int gear = 0;
 
-        if (bike != null)
-        {
-            speed = bike.speed;
-            rpm = bike.rpm;
-            gear = bike.currentGear;
-        }
-        else if (car != null)
+        // 3. Extract the data safely
+        if (car != null && car.isActiveAndEnabled)
         {
             speed = car.GetComponent<Rigidbody>().velocity.magnitude * 3.6f;
             rpm = car.rpm;
-            gear = car.currentGear;
+        }
+        else if (bike != null && bike.isActiveAndEnabled)
+        {
+            speed = bike.speed;
+            rpm = bike.rpm;
         }
 
+        // 4. Smooth the needle movement
         smoothSpeed = Mathf.SmoothDamp(smoothSpeed, speed, ref speedVelocity, needleResponsiveness);
         smoothRPM = Mathf.SmoothDamp(smoothRPM, rpm, ref rpmVelocity, needleResponsiveness);
 
         float speedPercent = Mathf.Clamp01(smoothSpeed / maxSpeed);
         float rpmPercent = Mathf.Clamp01(smoothRPM / maxRPM);
 
-        speedNeedle.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(speedMinAngle, speedMaxAngle, speedPercent));
-        rpmNeedle.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(rpmMinAngle, rpmMaxAngle, rpmPercent));
+        // 5. Apply the rotation to the UI Images
+        if (speedNeedle != null)
+            speedNeedle.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(speedMinAngle, speedMaxAngle, speedPercent));
 
-        if (gearText != null)
-        {
-            string currentGearStr = gear == 0 ? "N" : gear.ToString();
-            gearText.text = "Gear: " + currentGearStr;
-        }
+        if (rpmNeedle != null)
+            rpmNeedle.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(rpmMinAngle, rpmMaxAngle, rpmPercent));
     }
 
     IEnumerator StartupSweep()
@@ -92,6 +87,9 @@ public class DashboardController : MonoBehaviour
         isStartingUp = true;
         float timer = 0f;
 
+        if (speedNeedle == null || rpmNeedle == null) yield break;
+
+        // Sweep Up
         while (timer < sweepDuration)
         {
             timer += Time.deltaTime;
@@ -102,6 +100,7 @@ public class DashboardController : MonoBehaviour
         }
 
         timer = 0f;
+        // Sweep Down
         while (timer < sweepDuration)
         {
             timer += Time.deltaTime;
