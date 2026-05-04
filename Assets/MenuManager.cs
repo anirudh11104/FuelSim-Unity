@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 using System.Collections;
 
 public class MenuManager : MonoBehaviour
@@ -25,6 +26,28 @@ public class MenuManager : MonoBehaviour
     private bool isPaused = false;
     private bool inMainMenu = true;
     private float lastPauseTime = 0f;
+
+    // The invisible node that keeps the Input System awake
+    private GameObject hiddenFocusNode;
+
+    void Awake()
+    {
+        // Creates an invisible, unclickable Canvas in the background
+        hiddenFocusNode = new GameObject("Hidden_UI_Focus_Node");
+        Canvas canvas = hiddenFocusNode.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+        // Adds a button, but completely disables its ability to navigate
+        Button dummyButton = hiddenFocusNode.AddComponent<Button>();
+        Navigation nav = new Navigation();
+        nav.mode = Navigation.Mode.None;
+        dummyButton.navigation = nav;
+
+        // Makes it 100% invisible
+        CanvasGroup cg = hiddenFocusNode.AddComponent<CanvasGroup>();
+        cg.alpha = 0f;
+        cg.blocksRaycasts = false;
+    }
 
     void Start()
     {
@@ -61,28 +84,21 @@ public class MenuManager : MonoBehaviour
             else if (pauseMenuPanel.activeSelf) ResumeGame();
         }
 
-        // --- INVISIBLE UI WAKE-UP LOGIC ---
-        // Keeps the box hidden until you move the stick, but instantly catches the very first movement!
-        if (EventSystem.current.currentSelectedGameObject == null)
+        // --- THE INSTANT WAKE-UP LOGIC ---
+        // If the invisible node is selected, wait for the absolute tiniest stick movement
+        if (EventSystem.current.currentSelectedGameObject == hiddenFocusNode || EventSystem.current.currentSelectedGameObject == null)
         {
-            bool wakeUp = false;
-
             if (Gamepad.current != null)
             {
-                // The threshold is now 0.1f. The tiniest flick will wake it up on the first try.
-                if (Gamepad.current.leftStick.ReadValue().magnitude > 0.1f ||
-                    Gamepad.current.dpad.ReadValue().magnitude > 0.1f)
+                // sqrMagnitude of 0.05 ignores stick drift but instantly catches a real thumb push
+                if (Gamepad.current.leftStick.ReadValue().sqrMagnitude > 0.05f ||
+                    Gamepad.current.dpad.ReadValue().sqrMagnitude > 0.05f)
                 {
-                    wakeUp = true;
+                    if (mainMenuPanel.activeSelf) SetSelected(mainPlayButton);
+                    else if (vehicleSelectPanel.activeSelf) SetSelected(vehicleMotorcycleButton);
+                    else if (settingsPanel.activeSelf) SetSelected(settingsFirstOption);
+                    else if (pauseMenuPanel.activeSelf) SetSelected(pauseResumeButton);
                 }
-            }
-
-            if (wakeUp)
-            {
-                if (mainMenuPanel.activeSelf) SetSelected(mainPlayButton);
-                else if (vehicleSelectPanel.activeSelf) SetSelected(vehicleMotorcycleButton);
-                else if (settingsPanel.activeSelf) SetSelected(settingsFirstOption);
-                else if (pauseMenuPanel.activeSelf) SetSelected(pauseResumeButton);
             }
         }
     }
@@ -92,7 +108,7 @@ public class MenuManager : MonoBehaviour
     public void ShowMainMenu()
     {
         inMainMenu = true;
-        isPaused = false; // Reset pause state just to be safe
+        isPaused = false;
         Time.timeScale = 0f;
         AudioListener.pause = true;
 
@@ -102,8 +118,8 @@ public class MenuManager : MonoBehaviour
         CloseAllPanels();
         mainMenuPanel.SetActive(true);
 
-        // Hide the box initially
-        EventSystem.current.SetSelectedGameObject(null);
+        // THE FIX: Select the invisible node instead of null
+        SetSelected(hiddenFocusNode);
         if (hudCanvas != null) hudCanvas.SetActive(false);
     }
 
@@ -111,14 +127,14 @@ public class MenuManager : MonoBehaviour
     {
         CloseAllPanels();
         vehicleSelectPanel.SetActive(true);
-        EventSystem.current.SetSelectedGameObject(null);
+        SetSelected(hiddenFocusNode);
     }
 
     public void ShowSettings()
     {
         CloseAllPanels();
         settingsPanel.SetActive(true);
-        EventSystem.current.SetSelectedGameObject(null);
+        SetSelected(hiddenFocusNode);
     }
 
     public void BackFromSettings()
@@ -148,7 +164,7 @@ public class MenuManager : MonoBehaviour
     public void StartGame()
     {
         inMainMenu = false;
-        isPaused = false; // THE FIX: Forgets the old pause state when you start driving!
+        isPaused = false;
         StartCoroutine(EnableGameplayAfterDelay());
     }
 
@@ -164,8 +180,7 @@ public class MenuManager : MonoBehaviour
         CloseAllPanels();
         pauseMenuPanel.SetActive(true);
 
-        // Hide the box initially
-        EventSystem.current.SetSelectedGameObject(null);
+        SetSelected(hiddenFocusNode);
         if (hudCanvas != null) hudCanvas.SetActive(false);
     }
 
@@ -206,6 +221,12 @@ public class MenuManager : MonoBehaviour
     {
         EventSystem.current.SetSelectedGameObject(null);
         EventSystem.current.SetSelectedGameObject(firstButton);
+
+        Selectable selectable = firstButton.GetComponent<Selectable>();
+        if (selectable != null)
+        {
+            selectable.Select();
+        }
     }
 
     void OnApplicationQuit()
