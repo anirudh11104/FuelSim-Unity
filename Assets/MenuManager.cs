@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using System.Collections;
@@ -130,14 +130,20 @@ public class MenuManager : MonoBehaviour
     {
         motorcyclePlayer.SetActive(false);
         carPlayer.SetActive(true);
-        StartGame(); // This will close the menus and unpause the game!
+
+        ActiveVehicle.Current = carPlayer; // 👈 ADD THIS LINE
+
+        StartGame();
     }
 
     public void PlayAsMotorcycle()
     {
         carPlayer.SetActive(false);
         motorcyclePlayer.SetActive(true);
-        StartGame(); // This will close the menus and unpause the game!
+
+        ActiveVehicle.Current = motorcyclePlayer; // 👈 ADD THIS LINE
+
+        StartGame();
     }
 
     public void StartGame()

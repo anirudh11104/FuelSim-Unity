@@ -19,9 +19,14 @@ public class MileagePredictor : MonoBehaviour
     }
 
     private InferenceSession session;
-
+    public float currentMileage;
+    public CarEngineSimulator car;
     public BikeEngineSimulator bike;
-    public TextMeshProUGUI mileageText;
+
+    void OnEnable()
+    {
+        StartCoroutine(RealtimePredictionLoop());
+    }
 
     void Awake()
     {
@@ -30,13 +35,35 @@ public class MileagePredictor : MonoBehaviour
         session = new InferenceSession(modelPath);
 
         Debug.Log("Mileage model loaded successfully");
-        StartCoroutine(RealtimePredictionLoop());
+      
     }
 
     void RunPrediction()
     {
+        float speed = 0f;
+        float rpm = 0f;
+        int gear = 0;
+        float throttle = 0f;
+        bool engineRunning = false;
+
+        if (bike != null)
+        {
+            speed = bike.speed;
+            rpm = bike.rpm;
+            gear = bike.currentGear;
+            throttle = bike.throttle;
+            engineRunning = bike.engineRunning;
+        }
+        else if (car != null)
+        {
+            speed = car.GetComponent<Rigidbody>().velocity.magnitude * 3.6f;
+            rpm = car.rpm;
+            gear = car.currentGear;
+            throttle = car.throttle; // if exists
+            engineRunning = car.engineRunning;
+        }
         // Safety check just in case
-        if (bike == null || mileageText == null) return;
+        if (bike == null && car == null) return;
 
         float[] inputData = new float[21]
         {
@@ -47,10 +74,10 @@ public class MileagePredictor : MonoBehaviour
         11.5f,                     // Compression_Enumerator
         212f,                      // Weight_kg
 
-        bike.throttle * 100f,      // Throttle_pct
-        bike.rpm,                  // RPM
-        bike.currentGear,          // Gear
-        bike.speed,                // Speed_kmh
+        throttle * 100f,      // Throttle_pct
+        rpm,                  // RPM
+        gear,          // Gear
+        speed,                // Speed_kmh
 
         // ---- one-hot encoding (adjust per bike) ----
         0f, 1f, 0f,                // Fuel system
@@ -77,19 +104,19 @@ public class MileagePredictor : MonoBehaviour
         float finalMileage = 0f;
 
         // Only calculate mileage if the engine is actually running and moving
-        if (bike.engineRunning && bike.speed > 1f)
+        if (engineRunning && speed > 1f)
         {
             // TRUE COASTING: Throttle closed, clutch pulled OR IN NEUTRAL.
-            if (bike.throttle < 0.05f && (bike.clutch > 0.5f || bike.currentGear == 0))
+            if (throttle < 0.05f && (bike.clutch > 0.5f || gear == 0))
             {
-                float coastingBonus = Mathf.Max(2.0f, bike.speed / 10f);
+                float coastingBonus = Mathf.Max(2.0f, speed / 10f);
                 finalMileage = basePrediction * coastingBonus;
                 finalMileage = Mathf.Min(finalMileage, 99.9f);
             }
             // ENGINE BRAKING: Throttle closed, clutch engaged, IN GEAR.
-            else if (bike.throttle < 0.05f && bike.currentGear > 0)
+            else if (throttle < 0.05f && gear > 0)
             {
-                float engineBrakeBonus = Mathf.Max(1.5f, bike.speed / 15f);
+                float engineBrakeBonus = Mathf.Max(1.5f, speed / 15f);
                 finalMileage = basePrediction * engineBrakeBonus;
                 finalMileage = Mathf.Min(finalMileage, 99.9f);
             }
@@ -98,18 +125,18 @@ public class MileagePredictor : MonoBehaviour
                 // NORMAL DRIVING: The "Goldilocks" Hybrid Tune
                 // We take the AI's solid 17.6 baseline and apply gentle live physics
 
-                float gearClamp = Mathf.Clamp((float)bike.currentGear, 1f, 5f);
+                float gearClamp = Mathf.Clamp((float)gear, 1f, 5f);
 
                 // GEAR: 1st gear = 0.9x multiplier, 5th gear = 1.5x multiplier (Cruising bonus)
                 float gearFactor = Mathf.Lerp(0.9f, 1.5f, gearClamp / 5f);
 
                 // THROTTLE: Gentle throttle = 1.1x bonus, Pinned throttle = 0.85x penalty
-                float throttleFactor = Mathf.Lerp(1.1f, 0.85f, bike.throttle);
+                float throttleFactor = Mathf.Lerp(1.1f, 0.85f, throttle);
 
                 // RPM: Low RPM = 0.9 divisor (Bonus), Redline = 1.3 divisor (Penalty)
-                float rpmFactor = Mathf.Lerp(0.9f, 1.3f, bike.rpm / bike.maxRPM);
+                float rpmFactor = Mathf.Lerp(0.9f, 1.3f, rpm / bike.maxRPM);
 
-                if ((bike.clutch > 0.5f || bike.currentGear == 0) && bike.throttle > 0.1f)
+                if ((bike.clutch > 0.5f || gear == 0) && throttle > 0.1f)
                 {
                     // Revving in neutral penalty
                     throttleFactor *= 0.7f;
@@ -122,14 +149,14 @@ public class MileagePredictor : MonoBehaviour
                 finalMileage = Mathf.Clamp(finalMileage, 8f, 50f);
             }
         }
-        else if (bike.engineRunning && bike.speed <= 1f)
+        else if (engineRunning && speed <= 1f)
         {
             // Engine is idling but we are stopped
             finalMileage = 0f;
         }
 
         // 3. Display it!
-        mileageText.text = "Mileage: " + finalMileage.ToString("F1") + " km/l";
+        currentMileage = finalMileage;
     }
 
     IEnumerator RealtimePredictionLoop()
