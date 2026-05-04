@@ -9,6 +9,15 @@ using TMPro;
 
 public class MileagePredictor : MonoBehaviour
 {
+    public float GetCurrentMileage()
+    {
+        // Simply return the calculated finalMileage 
+        // Make sure your logic inside RunPrediction() saves the result 
+        // to a class-level variable, or return a value directly.
+        // For now, return a placeholder so the code compiles:
+        return 15.5f;
+    }
+
     private InferenceSession session;
 
     public BikeEngineSimulator bike;

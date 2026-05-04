@@ -2,7 +2,9 @@
 
 public class EngineSound : MonoBehaviour
 {
+    [Header("Vehicle Links (Assign One)")]
     public BikeEngineSimulator vehicle;
+    public CarEngineSimulator car;
 
     [Header("Audio Sources")]
     public AudioSource startupSource;
@@ -19,30 +21,26 @@ public class EngineSound : MonoBehaviour
     private float startTimer = 0f;
     private bool wasEngineRunning = false;
 
+    private bool EngineRunning => vehicle != null ? vehicle.engineRunning : (car != null ? car.engineRunning : false);
+    private float Rpm => vehicle != null ? vehicle.rpm : (car != null ? car.rpm : 0f);
+    private float MaxRpm => vehicle != null ? vehicle.maxRPM : (car != null ? car.maxRPM : 7000f);
+
     void Awake()
     {
-        // Force silence on boot
         if (startupSource != null) { startupSource.playOnAwake = false; startupSource.Stop(); }
         if (engineLoopSource != null) { engineLoopSource.playOnAwake = false; engineLoopSource.Stop(); }
     }
 
-    void Start()
-    {
-        // Safety check to find vehicle if the slot is empty
-        if (vehicle == null) vehicle = GetComponentInParent<BikeEngineSimulator>();
-    }
-
     void Update()
     {
-        // THE SAFETY SHIELD: If everything is null, stop everything and exit
-        if (vehicle == null || startupSource == null || engineLoopSource == null)
+        if ((vehicle == null && car == null) || startupSource == null || engineLoopSource == null)
         {
             if (engineLoopSource != null && engineLoopSource.isPlaying) engineLoopSource.Stop();
             return;
         }
 
         // --- 1. STARTUP LOGIC ---
-        if (vehicle.engineRunning && !wasEngineRunning)
+        if (EngineRunning && !wasEngineRunning)
         {
             isStarting = true;
             startTimer = 0f;
@@ -63,24 +61,23 @@ public class EngineSound : MonoBehaviour
         }
 
         // --- 2. RUNNING LOGIC ---
-        if (vehicle.engineRunning && !isStarting)
+        if (EngineRunning && !isStarting)
         {
-            float rpmPercent = Mathf.Clamp01(vehicle.rpm / vehicle.maxRPM);
+            float rpmPercent = Mathf.Clamp01(Rpm / MaxRpm);
             engineLoopSource.pitch = Mathf.Lerp(minPitch, maxPitch, rpmPercent);
             engineLoopSource.volume = Mathf.Lerp(0.6f, 1.0f, rpmPercent);
 
-            // Double check: if it somehow stopped, play it again
             if (!engineLoopSource.isPlaying) engineLoopSource.Play();
         }
 
         // --- 3. SHUTDOWN LOGIC ---
-        if (!vehicle.engineRunning)
+        if (!EngineRunning)
         {
             isStarting = false;
             if (startupSource.isPlaying) startupSource.Stop();
             if (engineLoopSource.isPlaying) engineLoopSource.Stop();
         }
 
-        wasEngineRunning = vehicle.engineRunning;
+        wasEngineRunning = EngineRunning;
     }
 }

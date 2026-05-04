@@ -3,7 +3,10 @@ using UnityEngine.InputSystem;
 
 public class GamepadHaptics : MonoBehaviour
 {
+    [Header("Vehicle References (Auto-Detects)")]
     public BikeEngineSimulator bike;
+    public CarEngineSimulator car;
+    private Rigidbody rb;
 
     [Header("Gear Shift Clunk")]
     public float shiftPulseDuration = 0.25f;
@@ -17,7 +20,7 @@ public class GamepadHaptics : MonoBehaviour
 
     [Header("Continuous Engine Purr (RT Throttle)")]
     public bool enableEnginePurr = true;
-    [Range(0f, 0.5f)] public float maxPurrIntensity = 0.05f; // Might need to bump this slightly now that it's tied to RT
+    [Range(0f, 0.5f)] public float maxPurrIntensity = 0.05f;
 
     [Header("Collision & Scraping")]
     public float impactPulseDuration = 0.35f;
@@ -35,30 +38,38 @@ public class GamepadHaptics : MonoBehaviour
 
     void Start()
     {
+        // Auto-detect the vehicle and physics body
         if (bike == null) bike = GetComponentInParent<BikeEngineSimulator>();
-        if (bike != null)
-        {
-            lastGear = bike.currentGear;
-            wasEngineRunning = bike.engineRunning;
-        }
+        if (car == null) car = GetComponentInParent<CarEngineSimulator>();
+        rb = GetComponentInParent<Rigidbody>();
+
+        lastGear = GetCurrentGear();
+        wasEngineRunning = IsEngineRunning();
     }
 
     void Update()
     {
-        if (Gamepad.current == null || bike == null) return;
+        if (Time.timeScale == 0f)
+        {
+            if (Gamepad.current != null) Gamepad.current.SetMotorSpeeds(0f, 0f);
+            return;
+        }
+        if (Gamepad.current == null || (bike == null && car == null)) return;
 
         // --- TRIGGERS ---
-        if (bike.currentGear != lastGear)
+        int currentGear = GetCurrentGear();
+        if (currentGear != lastGear)
         {
             shiftTimer = shiftPulseDuration;
-            lastGear = bike.currentGear;
+            lastGear = currentGear;
         }
 
-        if (bike.engineRunning && !wasEngineRunning)
+        bool engineRunning = IsEngineRunning();
+        if (engineRunning && !wasEngineRunning)
         {
             startTimer = startPulseDuration;
         }
-        wasEngineRunning = bike.engineRunning;
+        wasEngineRunning = engineRunning;
 
         // --- TIMERS ---
         if (impactTimer > 0) impactTimer -= Time.deltaTime;
@@ -83,12 +94,9 @@ public class GamepadHaptics : MonoBehaviour
         {
             Gamepad.current.SetMotorSpeeds(shiftLowFreq, shiftHighFreq);
         }
-        else if (enableEnginePurr && bike.engineRunning && bike.throttle > 0.01f)
+        else if (enableEnginePurr && engineRunning && GetThrottle() > 0.01f)
         {
-            // FIX: Tied directly to RT (throttle).
-            // If you hold RT 50%, it vibrates at 50% of the max purr.
-            // The millisecond you let go, it drops to 0.
-            float purr = bike.throttle * maxPurrIntensity;
+            float purr = GetThrottle() * maxPurrIntensity;
             Gamepad.current.SetMotorSpeeds(0f, purr);
         }
         else
@@ -102,7 +110,6 @@ public class GamepadHaptics : MonoBehaviour
     {
         if (Gamepad.current == null || collision.contactCount == 0) return;
 
-        // FIX: Increased from 0.5f to 0.75f to catch slanted walls!
         if (collision.GetContact(0).normal.y > 0.75f) return;
 
         float crashForce = collision.relativeVelocity.magnitude;
@@ -122,15 +129,14 @@ public class GamepadHaptics : MonoBehaviour
     {
         if (Gamepad.current == null || collision.contactCount == 0) return;
 
-        // FIX: Increased from 0.5f to 0.75f to catch slanted walls!
         if (collision.GetContact(0).normal.y > 0.75f) return;
 
-        if (bike.speed < 2f) return;
+        float currentSpeed = GetVehicleSpeed();
+        if (currentSpeed < 2f) return;
 
         Vector3 hitDirection = transform.InverseTransformPoint(collision.GetContact(0).point);
 
-        // Ensure scrape is always at least 50% intensity so it overrides the RT purr cleanly
-        float intensity = Mathf.Clamp(bike.speed / 30f, 0.5f, 1.0f);
+        float intensity = Mathf.Clamp(currentSpeed / 30f, 0.5f, 1.0f);
 
         if (hitDirection.x < 0) { scrapeLow = intensity; scrapeHigh = 0f; }
         else { scrapeLow = 0f; scrapeHigh = intensity; }
@@ -140,4 +146,35 @@ public class GamepadHaptics : MonoBehaviour
 
     void OnDisable() { if (Gamepad.current != null) Gamepad.current.SetMotorSpeeds(0f, 0f); }
     void OnApplicationQuit() { if (Gamepad.current != null) Gamepad.current.SetMotorSpeeds(0f, 0f); }
+
+    // =========================================================
+    // UNIVERSAL HELPERS (These make the script work for both!)
+    // =========================================================
+    private int GetCurrentGear()
+    {
+        if (bike != null) return bike.currentGear;
+        if (car != null) return car.currentGear;
+        return 0;
+    }
+
+    private bool IsEngineRunning()
+    {
+        if (bike != null) return bike.engineRunning;
+        if (car != null) return car.engineRunning;
+        return false;
+    }
+
+    private float GetThrottle()
+    {
+        if (bike != null) return bike.throttle;
+        if (car != null) return car.throttle;
+        return 0f;
+    }
+
+    private float GetVehicleSpeed()
+    {
+        if (bike != null) return bike.speed;
+        if (car != null && rb != null) return rb.velocity.magnitude * 3.6f;
+        return 0f;
+    }
 }

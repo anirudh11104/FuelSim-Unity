@@ -26,12 +26,26 @@ public class MileageDisplay : MonoBehaviour
         {
             baseAverageMileage = predictor.PredictMileage(engineCC, weight);
         }
+
+        // FIX 1: If the predictor returns 0 (or fails), use a realistic fallback! 
+        // This ensures the UI never gets permanently stuck on a blank screen.
+        if (baseAverageMileage <= 0f)
+        {
+            baseAverageMileage = 25f; // Fallback baseline (25 km/l)
+        }
     }
 
     void Update()
     {
-        // Safety check
-        if (bike == null || mileageText == null || baseAverageMileage == 0f) return;
+        if (mileageText == null) return;
+
+        // FIX 2: If we switched vehicles and the bike is null or disabled, 
+        // clear the text or set it to 0 instead of freezing the last number.
+        if (bike == null || !bike.gameObject.activeInHierarchy)
+        {
+            mileageText.text = ""; // Or "Mileage: --"
+            return;
+        }
 
         float instantMileage = 0f;
 
@@ -43,7 +57,8 @@ public class MileageDisplay : MonoBehaviour
             float rpmFactor = Mathf.Clamp(bike.rpm / 3500f, 0.5f, 3.0f);
 
             // High Gear = Better Fuel Economy (Bonus multiplier for 5th gear)
-            float gearFactor = Mathf.Clamp(bike.currentGear / (float)bike.maxGear, 0.3f, 1.2f);
+            float gearClamp = Mathf.Max(1f, (float)bike.currentGear); 
+            float gearFactor = Mathf.Clamp(gearClamp / (float)bike.maxGear, 0.3f, 1.2f);
 
             // Heavy Throttle = Worse Fuel Economy
             float throttlePenalty = Mathf.Lerp(1.0f, 0.6f, bike.throttle);

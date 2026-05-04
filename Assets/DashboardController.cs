@@ -5,13 +5,14 @@ using TMPro;
 
 public class DashboardController : MonoBehaviour
 {
-    [Header("Connections")]
+    [Header("Connections (Link BOTH here!)")]
     public BikeEngineSimulator vehicle;
+    public CarEngineSimulator car;
     public RectTransform speedNeedle;
     public RectTransform rpmNeedle;
 
     [Header("Digital Displays")]
-    public TextMeshProUGUI gearText; // Kept this for the Gear Display!
+    public TextMeshProUGUI gearText;
 
     [Header("Speedometer Settings")]
     public float speedMinAngle = 140f;
@@ -35,14 +36,23 @@ public class DashboardController : MonoBehaviour
     private float smoothRPM;
     private float speedVelocity;
     private float rpmVelocity;
-
     private bool wasGamepadConnected = false;
 
-    void Start()
+    // --- THE SMART SWITCH ---
+    private bool UseCar
     {
-        if (vehicle == null)
-            vehicle = FindFirstObjectByType<BikeEngineSimulator>();
+        get
+        {
+            if (car != null && car.engineRunning) return true;
+            if (vehicle != null && vehicle.engineRunning) return false;
+            if (car != null && car.gameObject.activeInHierarchy && (vehicle == null || !vehicle.gameObject.activeInHierarchy)) return true;
+            return false;
+        }
     }
+
+    private float Speed => UseCar ? car.GetComponent<Rigidbody>().velocity.magnitude * 3.6f : (vehicle != null ? vehicle.speed : 0f);
+    private float Rpm => UseCar ? car.rpm : (vehicle != null ? vehicle.rpm : 0f);
+    private int CurrentGear => UseCar ? car.currentGear : (vehicle != null ? vehicle.currentGear : 0);
 
     void Update()
     {
@@ -54,10 +64,10 @@ public class DashboardController : MonoBehaviour
         }
         wasGamepadConnected = isGamepadConnected;
 
-        if (isStartingUp || vehicle == null) return;
+        if (isStartingUp || (vehicle == null && car == null)) return;
 
-        smoothSpeed = Mathf.SmoothDamp(smoothSpeed, vehicle.speed, ref speedVelocity, needleResponsiveness);
-        smoothRPM = Mathf.SmoothDamp(smoothRPM, vehicle.rpm, ref rpmVelocity, needleResponsiveness);
+        smoothSpeed = Mathf.SmoothDamp(smoothSpeed, Speed, ref speedVelocity, needleResponsiveness);
+        smoothRPM = Mathf.SmoothDamp(smoothRPM, Rpm, ref rpmVelocity, needleResponsiveness);
 
         float speedPercent = Mathf.Clamp01(smoothSpeed / maxSpeed);
         float rpmPercent = Mathf.Clamp01(smoothRPM / maxRPM);
@@ -65,10 +75,9 @@ public class DashboardController : MonoBehaviour
         speedNeedle.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(speedMinAngle, speedMaxAngle, speedPercent));
         rpmNeedle.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(rpmMinAngle, rpmMaxAngle, rpmPercent));
 
-        // --- GEAR DISPLAY ONLY ---
         if (gearText != null)
         {
-            string currentGearStr = vehicle.currentGear == 0 ? "N" : vehicle.currentGear.ToString();
+            string currentGearStr = CurrentGear == 0 ? "N" : CurrentGear.ToString();
             gearText.text = "Gear: " + currentGearStr;
         }
     }
@@ -97,9 +106,8 @@ public class DashboardController : MonoBehaviour
             yield return null;
         }
 
-        smoothSpeed = vehicle != null ? vehicle.speed : 0;
-        smoothRPM = vehicle != null ? vehicle.rpm : 0;
-
+        smoothSpeed = Speed;
+        smoothRPM = Rpm;
         isStartingUp = false;
     }
 }
