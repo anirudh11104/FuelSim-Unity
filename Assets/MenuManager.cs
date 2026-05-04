@@ -110,6 +110,20 @@ public class MenuManager : MonoBehaviour
         EventSystem.current.SetSelectedGameObject(null);
     }
 
+    // --- NEW: Smart UI Back Button Logic ---
+    public void BackFromSettings()
+    {
+        // Check our state to see where we came from
+        if (inMainMenu)
+        {
+            ShowMainMenu();
+        }
+        else
+        {
+            PauseGame(); // This brings the pause menu back up!
+        }
+    }
+
     // --- GAMEPLAY STATE ---
 
     public void PlayAsCar()
