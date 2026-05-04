@@ -99,7 +99,20 @@ public class MileagePredictor : MonoBehaviour
 
         // Let's ensure the baseline sits around 17-18 km/l from the AI
         if (basePrediction < 1f) basePrediction = 17.5f;
+        float clutch = 0f;
+        float maxRPM = 8000f;
 
+        if (bike != null)
+        {
+            clutch = bike.clutch;
+            maxRPM = bike.maxRPM;
+        }
+        else if (car != null)
+        {
+            // If car doesn't have clutch, keep it 0
+            clutch = 0f;
+            maxRPM = car.maxRPM;
+        }
         // 2. --- REAL-TIME PHYSICS MODIFIER (CLASSIC 350 TUNE) ---
         float finalMileage = 0f;
 
@@ -107,7 +120,7 @@ public class MileagePredictor : MonoBehaviour
         if (engineRunning && speed > 1f)
         {
             // TRUE COASTING: Throttle closed, clutch pulled OR IN NEUTRAL.
-            if (throttle < 0.05f && (bike.clutch > 0.5f || gear == 0))
+            if (throttle < 0.05f && (clutch > 0.5f || gear == 0))
             {
                 float coastingBonus = Mathf.Max(2.0f, speed / 10f);
                 finalMileage = basePrediction * coastingBonus;
@@ -134,9 +147,9 @@ public class MileagePredictor : MonoBehaviour
                 float throttleFactor = Mathf.Lerp(1.1f, 0.85f, throttle);
 
                 // RPM: Low RPM = 0.9 divisor (Bonus), Redline = 1.3 divisor (Penalty)
-                float rpmFactor = Mathf.Lerp(0.9f, 1.3f, rpm / bike.maxRPM);
+                float rpmFactor = Mathf.Lerp(0.9f, 1.3f, rpm / maxRPM);
 
-                if ((bike.clutch > 0.5f || gear == 0) && throttle > 0.1f)
+                if ((clutch > 0.5f || gear == 0) && throttle > 0.1f)
                 {
                     // Revving in neutral penalty
                     throttleFactor *= 0.7f;
