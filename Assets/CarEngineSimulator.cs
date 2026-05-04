@@ -117,15 +117,9 @@ public class CarEngineSimulator : MonoBehaviour
 
     void Update()
     {
-        // Safety freeze for when the game is paused
-        if(Time.timeScale == 0f)
-        {
-            if (Gamepad.current != null)
-            {
-                Gamepad.current.SetMotorSpeeds(0f, 0f);
-            }
-            return;
-        }
+        // Safety freeze for when the game is paused. 
+        // No haptic spam allowed here!
+        if (Time.timeScale == 0f) return;
 
         HandleInput();
         TryStarterMotor();
