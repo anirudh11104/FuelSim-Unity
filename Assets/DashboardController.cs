@@ -34,6 +34,19 @@ public class DashboardController : MonoBehaviour
     private float rpmVelocity;
     private bool wasGamepadConnected = false;
 
+    void OnEnable()
+    {
+        // If the vehicle gets turned off while sweeping, this resets the lock
+        isStartingUp = false;
+
+        // This forces the cool sweeping animation to play every time you switch vehicles!
+        wasGamepadConnected = false;
+
+        // Resets the needle momentum so it doesn't jump weirdly
+        smoothSpeed = 0f;
+        smoothRPM = 0f;
+    }
+
     void Update()
     {
         // 1. Gamepad Sweep Animation Logic
