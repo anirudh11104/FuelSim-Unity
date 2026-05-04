@@ -7,6 +7,7 @@ public class GearDisplay : MonoBehaviour
 
     void Update()
     {
+        if (gearText == null) return;
         // 1. Find which vehicle is currently active in the scene
         var car = FindFirstObjectByType<CarEngineSimulator>();
         var bike = FindFirstObjectByType<BikeEngineSimulator>();
