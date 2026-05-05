@@ -3,21 +3,16 @@ using UnityEngine.InputSystem;
 
 public class CarEngineSimulator : MonoBehaviour
 {
-    // ================= WHEELS =================
-    [Header("Wheel Colliders")]
     public WheelCollider frontLeft;
     public WheelCollider frontRight;
     public WheelCollider rearLeft;
     public WheelCollider rearRight;
 
-    [Header("Visual Meshes")]
     public Transform meshFL;
     public Transform meshFR;
     public Transform meshRL;
     public Transform meshRR;
 
-    // ================= ENGINE =================
-    [Header("Engine")]
     public bool engineRunning = false;
     public float rpm;
     public float idleRPM = 900f;
@@ -25,48 +20,45 @@ public class CarEngineSimulator : MonoBehaviour
     public float stallRPM = 600f;
     public float engineMaxTorque = 300f;
 
-    // ================= SPEED & INPUT =================
     public float wheelSpeed;
     public float throttle;
-    public float clutch; // 0 = released, 1 = pulled
+    public float clutch;
     public float clutchInputRaw;
 
     public float steerInput;
-    private float smoothedSteer; // Kills the bouncing!
+    private float smoothedSteer;
     public float maxSteerAngle = 35f;
 
     public float brakeInput;
     public float brakePower = 3000f;
 
-    // ================= TRANSMISSION =================
-    public int currentGear = 0; // Starts in Neutral
+    public int currentGear = 0;
     public int maxGear = 5;
     float[] gearRatios = { 0f, 3.16f, 1.88f, 1.29f, 0.97f, 0.73f };
     public float reverseGearRatio = -3.2f;
     public float finalDriveRatio = 3.4f;
 
-    [Header("Clutch Physics")]
     public float bitePoint = 0.65f;
     public float maxClutchTorque = 500f;
+
+    public float downforceMultiplier = 50f;
 
     private bool starterPressed;
     private Rigidbody rb;
 
-    // --- TELEPORT VARIABLES ---
     private Vector3 spawnPosition;
     private Quaternion spawnRotation;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        // Take a snapshot of the exact starting position when the scene loads
         spawnPosition = transform.position;
         spawnRotation = transform.rotation;
     }
 
     void Start()
     {
-        rb.centerOfMass = new Vector3(0, -0.1f, 0);
+        rb.centerOfMass = new Vector3(0, -0.2f, 0.4f);
     }
 
     void OnEnable()
@@ -93,7 +85,6 @@ public class CarEngineSimulator : MonoBehaviour
             rearLeft.enabled = true;
             rearRight.enabled = true;
 
-            // THE FIX: Turn physics back on BEFORE clearing momentum!
             rb.isKinematic = false;
             rb.velocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
@@ -111,14 +102,11 @@ public class CarEngineSimulator : MonoBehaviour
 
     void OnDisable()
     {
-        // Kill controller rumble
         if (Gamepad.current != null) Gamepad.current.SetMotorSpeeds(0f, 0f);
     }
 
     void Update()
     {
-        // Safety freeze for when the game is paused. 
-        // No haptic spam allowed here!
         if (Time.timeScale == 0f) return;
 
         HandleInput();
@@ -130,6 +118,12 @@ public class CarEngineSimulator : MonoBehaviour
     {
         SimulateEngineAndDrivetrain();
         CheckStall();
+        ApplyDownforce();
+    }
+
+    void ApplyDownforce()
+    {
+        rb.AddForce(-transform.up * downforceMultiplier * rb.velocity.magnitude);
     }
 
     void HandleInput()
@@ -139,16 +133,14 @@ public class CarEngineSimulator : MonoBehaviour
         steerInput = 0f;
         starterPressed = false;
 
-        // --- GAMEPAD INPUT ---
         if (Gamepad.current != null)
         {
             float rt = Gamepad.current.rightTrigger.ReadValue();
             float lt = Gamepad.current.leftTrigger.ReadValue();
             bool rbKey = Gamepad.current.rightShoulder.isPressed;
 
-            clutchInputRaw = lt; // Left Trigger is strictly Clutch
+            clutchInputRaw = lt;
 
-            // Right Trigger is Throttle, UNLESS Right Shoulder is held, then it's Brake
             if (rbKey) brakeInput = rt;
             else throttle = rt;
 
@@ -156,7 +148,6 @@ public class CarEngineSimulator : MonoBehaviour
 
             if (Gamepad.current.buttonSouth.wasPressedThisFrame) starterPressed = true;
 
-            // SHIFT ONLY IF CLUTCH LEVER PULLED
             if (clutchInputRaw > 0.8f)
             {
                 if (Gamepad.current.buttonEast.wasPressedThisFrame) ShiftUp();
@@ -165,7 +156,6 @@ public class CarEngineSimulator : MonoBehaviour
         }
         else
         {
-            // --- KEYBOARD FALLBACK ---
             if (Input.GetKey(KeyCode.W)) throttle = 1f;
             if (Input.GetKey(KeyCode.S)) brakeInput = 1f;
             if (Input.GetKey(KeyCode.LeftShift)) clutchInputRaw = 1f; else clutchInputRaw = 0f;
@@ -180,17 +170,15 @@ public class CarEngineSimulator : MonoBehaviour
             }
         }
 
-        // Kill throttle if engine is off
         if (!engineRunning) throttle = 0f;
 
-        // Smooth the clutch
         clutch = Mathf.Lerp(clutch, clutchInputRaw, Time.deltaTime * 6f);
     }
 
     void TryStarterMotor()
     {
         if (!starterPressed) return;
-        if (clutchInputRaw < 0.9f && currentGear != 0) return; // Must hold clutch if in gear
+        if (clutchInputRaw < 0.9f && currentGear != 0) return;
 
         if (engineRunning)
             engineRunning = false;
@@ -205,7 +193,6 @@ public class CarEngineSimulator : MonoBehaviour
     {
         if (!engineRunning) return;
 
-        // If RPM drops too low while in gear and clutch is engaged
         if (rpm <= stallRPM && clutch < bitePoint && currentGear != 0)
         {
             engineRunning = false;
@@ -217,88 +204,79 @@ public class CarEngineSimulator : MonoBehaviour
         if (currentGear < maxGear)
         {
             currentGear++;
-            // Don't rev match if we are just shifting into Neutral (0)
             if (currentGear > 0) rpm = Mathf.Max(rpm * 0.85f, idleRPM);
         }
     }
 
     void ShiftDown()
     {
-        // Allow the gear to drop to -1 (Reverse)
         if (currentGear > -1)
         {
             currentGear--;
-            // Rev match as long as we aren't shifting into Neutral
             if (currentGear != 0) rpm = Mathf.Min(rpm * 1.15f, maxRPM);
         }
     }
 
     void SimulateEngineAndDrivetrain()
     {
-        // 1. Calculate wheel speed (YOU WERE MISSING THIS LINE)
         float currentWheelRPM = (frontLeft.rpm + frontRight.rpm + rearLeft.rpm + rearRight.rpm) / 4f;
 
-        // 2. --- NEW RATIO LOOKUP ---
-        // If gear is -1, use the reverse ratio. Otherwise, use the standard array.
         float activeRatio = (currentGear == -1) ? reverseGearRatio : gearRatios[currentGear];
         float totalRatio = activeRatio * finalDriveRatio;
 
         float engineTargetRPM = currentWheelRPM * totalRatio;
 
-        // 3. Clutch Logic (Blending Idle with Wheel Speed)
         float engagement = Mathf.Clamp01(1f - clutch);
 
         if (engineRunning)
         {
             if (currentGear == 0)
             {
-                // Neutral revving
                 rpm = Mathf.Lerp(rpm, idleRPM + (throttle * (maxRPM - idleRPM)), Time.fixedDeltaTime * 2f);
             }
             else
             {
-                // In gear: RPM is a blend of your throttle and the physical wheel speed
                 float drivenRPM = Mathf.Lerp(idleRPM + (throttle * (maxRPM - idleRPM)), engineTargetRPM, engagement);
                 rpm = Mathf.Clamp(drivenRPM, 0, maxRPM);
             }
         }
         else
         {
-            rpm = Mathf.Lerp(rpm, 0, Time.fixedDeltaTime * 2f); // Engine dies
+            rpm = Mathf.Lerp(rpm, 0, Time.fixedDeltaTime * 2f);
         }
 
-        // 4. Torque Calculation (WRX Turbo Curve)
         float normalizedRPM = Mathf.InverseLerp(0, maxRPM, rpm);
 
-        // Simulates turbo lag down low, massive boost peaking at 60% RPM (~4300 RPM), and slight taper at redline
         float torqueCurve = 1f - Mathf.Pow(normalizedRPM - 0.6f, 2f);
 
-        // 5. --- THE REVERSE FIX ---
-        // I changed "currentGear > 0" to "currentGear != 0"
-        // Now it applies power in 1st-5th AND in Reverse (-1), but not in Neutral (0)
         float motorTorque = 0f;
         if (engineRunning && currentGear != 0)
         {
             motorTorque = throttle * engineMaxTorque * torqueCurve * totalRatio * engagement;
         }
 
-        // Apply Torque to all 4 wheels
         frontLeft.motorTorque = motorTorque / 4f;
         frontRight.motorTorque = motorTorque / 4f;
         rearLeft.motorTorque = motorTorque / 4f;
         rearRight.motorTorque = motorTorque / 4f;
 
-        // 6. Braking
         float appliedBrake = brakeInput * brakePower;
         frontLeft.brakeTorque = appliedBrake;
         frontRight.brakeTorque = appliedBrake;
         rearLeft.brakeTorque = appliedBrake;
         rearRight.brakeTorque = appliedBrake;
 
-        // 7. SMOOTHED STEERING
+        // Calculate how fast the car is physically moving in km/h
+        float currentSpeed = rb.velocity.magnitude * 3.6f;
+
+        // THE FILTER: At 0 km/h you get 100% steering. At 120 km/h you only get 20% steering.
+        float speedSteerFactor = Mathf.Lerp(1.0f, 0.2f, currentSpeed / 120f);
+        float dynamicMaxSteer = maxSteerAngle * speedSteerFactor;
+
+        // Apply the safe, filtered steering angle
         smoothedSteer = Mathf.Lerp(smoothedSteer, steerInput, Time.fixedDeltaTime * 5f);
-        frontLeft.steerAngle = smoothedSteer * maxSteerAngle;
-        frontRight.steerAngle = smoothedSteer * maxSteerAngle;
+        frontLeft.steerAngle = smoothedSteer * dynamicMaxSteer;
+        frontRight.steerAngle = smoothedSteer * dynamicMaxSteer;
     }
 
     void SyncVisualWheels()
