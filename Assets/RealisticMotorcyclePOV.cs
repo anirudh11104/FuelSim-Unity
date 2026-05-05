@@ -60,10 +60,12 @@ public class RealisticMotorcyclePOV : MonoBehaviour
         if (vehicle == null || cameraMountPoint == null) return;
 
         // --- 1. THE JITTER KILLER (Absolute Tracking) ---
-        // We read the perfectly interpolated Rigidbody mount point directly. 
-        // No Slerps, no SmoothDamps on the world tracking.
         Vector3 basePosition = cameraMountPoint.position;
-        Quaternion baseRotation = cameraMountPoint.rotation;
+
+        // THE FIX: Grab the mount's angles, but force the Z-axis (roll) to 0.
+        // This keeps the horizon perfectly level while still tracking hills and turns!
+        Vector3 baseAngles = cameraMountPoint.rotation.eulerAngles;
+        Quaternion baseRotation = Quaternion.Euler(baseAngles.x, baseAngles.y, 0f);
 
         // --- 2. MANUAL LOOK ---
         float inputX = 0f;
