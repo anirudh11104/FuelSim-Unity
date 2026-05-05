@@ -223,12 +223,9 @@ public class CarEngineSimulator : MonoBehaviour
     void SimulateEngineAndDrivetrain()
     {
         float currentWheelRPM = (frontLeft.rpm + frontRight.rpm + rearLeft.rpm + rearRight.rpm) / 4f;
-
         float activeRatio = (currentGear == -1) ? reverseGearRatio : gearRatios[currentGear];
         float totalRatio = activeRatio * finalDriveRatio;
-
         float engineTargetRPM = currentWheelRPM * totalRatio;
-
         float engagement = Mathf.Clamp01(1f - clutch);
 
         if (engineRunning)
@@ -263,7 +260,8 @@ public class CarEngineSimulator : MonoBehaviour
             }
             else if (throttle > 0f)
             {
-                motorTorque = throttle * engineMaxTorque * torqueCurve * totalRatio * engagement;
+                float gameyTorqueBoost = Mathf.Lerp(1f, 2.5f, (currentGear - 1f) / (maxGear - 1f));
+                motorTorque = throttle * engineMaxTorque * torqueCurve * totalRatio * engagement * gameyTorqueBoost;
             }
             else
             {
@@ -289,7 +287,6 @@ public class CarEngineSimulator : MonoBehaviour
         rearRight.brakeTorque = finalBrake;
 
         float currentSpeed = rb.velocity.magnitude * 3.6f;
-
         float speedSteerFactor = Mathf.Lerp(1.0f, 0.2f, currentSpeed / 120f);
         float dynamicMaxSteer = maxSteerAngle * speedSteerFactor;
 
