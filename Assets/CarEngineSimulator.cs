@@ -31,6 +31,7 @@ public class CarEngineSimulator : MonoBehaviour
 
     public float brakeInput;
     public float brakePower = 3000f;
+    public float baseEngineBraking = 500f;
 
     public int currentGear = 0;
     public int maxGear = 5;
@@ -112,6 +113,8 @@ public class CarEngineSimulator : MonoBehaviour
         HandleInput();
         TryStarterMotor();
         SyncVisualWheels();
+
+        wheelSpeed = rb.velocity.magnitude * 3.6f;
     }
 
     void FixedUpdate()
@@ -246,13 +249,26 @@ public class CarEngineSimulator : MonoBehaviour
         }
 
         float normalizedRPM = Mathf.InverseLerp(0, maxRPM, rpm);
-
         float torqueCurve = 1f - Mathf.Pow(normalizedRPM - 0.6f, 2f);
 
         float motorTorque = 0f;
+        float engineBrakingForce = 0f;
+
         if (engineRunning && currentGear != 0)
         {
-            motorTorque = throttle * engineMaxTorque * torqueCurve * totalRatio * engagement;
+            if (engineTargetRPM > maxRPM && throttle > 0f)
+            {
+                motorTorque = 0f;
+                engineBrakingForce = 2000f;
+            }
+            else if (throttle > 0f)
+            {
+                motorTorque = throttle * engineMaxTorque * torqueCurve * totalRatio * engagement;
+            }
+            else
+            {
+                engineBrakingForce = baseEngineBraking * Mathf.Abs(totalRatio) * engagement * (rpm / maxRPM);
+            }
         }
 
         frontLeft.motorTorque = motorTorque / 4f;
@@ -260,20 +276,23 @@ public class CarEngineSimulator : MonoBehaviour
         rearLeft.motorTorque = motorTorque / 4f;
         rearRight.motorTorque = motorTorque / 4f;
 
-        float appliedBrake = brakeInput * brakePower;
-        frontLeft.brakeTorque = appliedBrake;
-        frontRight.brakeTorque = appliedBrake;
-        rearLeft.brakeTorque = appliedBrake;
-        rearRight.brakeTorque = appliedBrake;
+        float finalBrake = brakeInput * brakePower;
 
-        // Calculate how fast the car is physically moving in km/h
+        if (brakeInput < 0.1f && engineBrakingForce > 0f)
+        {
+            finalBrake = engineBrakingForce;
+        }
+
+        frontLeft.brakeTorque = finalBrake;
+        frontRight.brakeTorque = finalBrake;
+        rearLeft.brakeTorque = finalBrake;
+        rearRight.brakeTorque = finalBrake;
+
         float currentSpeed = rb.velocity.magnitude * 3.6f;
 
-        // THE FILTER: At 0 km/h you get 100% steering. At 120 km/h you only get 20% steering.
         float speedSteerFactor = Mathf.Lerp(1.0f, 0.2f, currentSpeed / 120f);
         float dynamicMaxSteer = maxSteerAngle * speedSteerFactor;
 
-        // Apply the safe, filtered steering angle
         smoothedSteer = Mathf.Lerp(smoothedSteer, steerInput, Time.fixedDeltaTime * 5f);
         frontLeft.steerAngle = smoothedSteer * dynamicMaxSteer;
         frontRight.steerAngle = smoothedSteer * dynamicMaxSteer;
