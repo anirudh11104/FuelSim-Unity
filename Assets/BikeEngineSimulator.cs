@@ -172,7 +172,6 @@ public class BikeEngineSimulator : MonoBehaviour
 
     {
 
-        Time.timeScale = 1f;
 
 
 

@@ -64,7 +64,6 @@ public class CarEngineSimulator : MonoBehaviour
 
     void OnEnable()
     {
-        Time.timeScale = 1f;
 
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)

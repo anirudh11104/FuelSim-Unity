@@ -104,6 +104,24 @@ public class MenuManager : MonoBehaviour
         }
     }
 
+    // --- NEW SELECTION METHODS ---
+    public void SelectMotorcycle()
+    {
+        if (carPlayer != null) carPlayer.SetActive(false);
+        if (motorcyclePlayer != null) motorcyclePlayer.SetActive(true);
+        Time.timeScale = 0f; // Force it to stay paused!
+        ShowTuning();
+    }
+
+    public void SelectCar()
+    {
+        if (motorcyclePlayer != null) motorcyclePlayer.SetActive(false);
+        if (carPlayer != null) carPlayer.SetActive(true);
+        Time.timeScale = 0f; // Force it to stay paused!
+        ShowTuning();
+    }
+    // -----------------------------
+
     public void ShowMainMenu()
     {
         inMainMenu = true;
@@ -113,6 +131,11 @@ public class MenuManager : MonoBehaviour
 
         InputSystem.PauseHaptics();
         if (Gamepad.current != null) Gamepad.current.SetMotorSpeeds(0f, 0f);
+
+        // --- PREVENT 2ND PLAYTHROUGH BUG ---
+        if (carPlayer != null) carPlayer.SetActive(false);
+        if (motorcyclePlayer != null) motorcyclePlayer.SetActive(false);
+        // -----------------------------------
 
         CloseAllPanels();
         mainMenuPanel.SetActive(true);
@@ -218,8 +241,6 @@ public class MenuManager : MonoBehaviour
     private void SetSelected(GameObject firstButton)
     {
         if (EventSystem.current == null) return;
-
-        // Anti-Spam Lock: If it's already selected, don't do anything!
         if (EventSystem.current.currentSelectedGameObject == firstButton) return;
 
         EventSystem.current.SetSelectedGameObject(null);
