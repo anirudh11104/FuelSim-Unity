@@ -116,6 +116,7 @@ public class MenuManager : MonoBehaviour
     {
         if (carPlayer != null) carPlayer.SetActive(false);
         if (motorcyclePlayer != null) motorcyclePlayer.SetActive(true);
+        ActiveVehicle.Current = motorcyclePlayer;
         Time.timeScale = 0f; // Force it to stay paused!
         ShowTuning();
     }
@@ -124,6 +125,7 @@ public class MenuManager : MonoBehaviour
     {
         if (motorcyclePlayer != null) motorcyclePlayer.SetActive(false);
         if (carPlayer != null) carPlayer.SetActive(true);
+        ActiveVehicle.Current = carPlayer;
         Time.timeScale = 0f; // Force it to stay paused!
         ShowTuning();
     }

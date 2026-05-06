@@ -70,6 +70,7 @@ public class BikeEngineSimulator : MonoBehaviour
 
     float[] gearRatios = { 0f, 12.5f, 9.0f, 7.0f, 5.5f, 4.5f, 3.8f };
 
+    public float finalDriveRatio = 1f;
 
 
     // ================= CLUTCH =================
@@ -573,7 +574,7 @@ public class BikeEngineSimulator : MonoBehaviour
 
     {
 
-        float gearRatio = gearRatios[currentGear];
+        float gearRatio = gearRatios[currentGear] * finalDriveRatio; // <-- ADD MULTIPLIER
 
         float engineRadS = rpm * Mathf.PI / 30f;
 
@@ -715,7 +716,7 @@ public class BikeEngineSimulator : MonoBehaviour
 
             Quaternion targetSteer = Quaternion.Euler(0, steerInput * maxSteerAngle, 0);
 
-            frontAssembly.localRotation = Quaternion.Slerp(frontAssembly.localRotation, targetSteer, Time.fixedDeltaTime * 10f);
+            frontAssembly.localRotation = Quaternion.Slerp(frontAssembly.localRotation, targetSteer, Time.fixedDeltaTime * 12f);
 
         }
 
@@ -785,7 +786,7 @@ public class BikeEngineSimulator : MonoBehaviour
 
         {
 
-            float turnAmount = cleanSteer * 60f * Time.fixedDeltaTime;
+            float turnAmount = cleanSteer * 40f * Time.fixedDeltaTime;
 
             float targetLean = -cleanSteer * 35f;
 
@@ -793,7 +794,7 @@ public class BikeEngineSimulator : MonoBehaviour
 
             if (currentLean > 180f) currentLean -= 360f;
 
-            float newLean = Mathf.Lerp(currentLean, targetLean, Time.fixedDeltaTime * 8f);
+            float newLean = Mathf.Lerp(currentLean, targetLean, Time.fixedDeltaTime * 5.5f);
 
 
 
