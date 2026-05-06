@@ -14,8 +14,15 @@ public class MenuManager : MonoBehaviour
     public GameObject pauseMenuPanel;
     public GameObject hudCanvas;
 
-    [Header("Tuning Elements")]
-    public GameObject tuningPlayButton;
+    [Header("Tuning Dynamic Layout")]
+    public Button tuningDefaultBtn;
+    public Button tuningPlayBtn;
+    public Button tuningBackBtn;
+    public RectTransform playBtnRect;
+    public RectTransform backBtnRect;
+
+    private float originalBackY;
+    private bool savedBackY = false;
 
     [Header("First Selected (For Gamepad)")]
     public GameObject mainPlayButton;
@@ -163,9 +170,51 @@ public class MenuManager : MonoBehaviour
         CloseAllPanels();
         tuningPanel.SetActive(true);
 
-        if (tuningPlayButton != null)
+        bool showPlayButton = inMainMenu;
+
+        if (!savedBackY && backBtnRect != null)
         {
-            tuningPlayButton.SetActive(inMainMenu);
+            originalBackY = backBtnRect.anchoredPosition.y;
+            savedBackY = true;
+        }
+
+        if (tuningDefaultBtn != null && tuningPlayBtn != null && tuningBackBtn != null)
+        {
+            tuningPlayBtn.gameObject.SetActive(showPlayButton);
+
+            Navigation defNav = tuningDefaultBtn.navigation;
+            Navigation playNav = tuningPlayBtn.navigation;
+            Navigation backNav = tuningBackBtn.navigation;
+
+            defNav.mode = Navigation.Mode.Explicit;
+            playNav.mode = Navigation.Mode.Explicit;
+            backNav.mode = Navigation.Mode.Explicit;
+
+            if (showPlayButton)
+            {
+                // Reset Back button to original bottom position
+                if (backBtnRect != null) backBtnRect.anchoredPosition = new Vector2(backBtnRect.anchoredPosition.x, originalBackY);
+
+                defNav.selectOnDown = tuningPlayBtn;
+
+                playNav.selectOnUp = tuningDefaultBtn;
+                playNav.selectOnDown = tuningBackBtn;
+
+                backNav.selectOnUp = tuningPlayBtn;
+            }
+            else
+            {
+                // Move Back button up to fill the void
+                if (backBtnRect != null && playBtnRect != null)
+                    backBtnRect.anchoredPosition = new Vector2(backBtnRect.anchoredPosition.x, playBtnRect.anchoredPosition.y);
+
+                defNav.selectOnDown = tuningBackBtn;
+                backNav.selectOnUp = tuningDefaultBtn;
+            }
+
+            tuningDefaultBtn.navigation = defNav;
+            tuningPlayBtn.navigation = playNav;
+            tuningBackBtn.navigation = backNav;
         }
 
         SetSelected(hiddenFocusNode);
