@@ -115,10 +115,18 @@ public class RealisticCarPOV : MonoBehaviour
 
         // Z-Surge: Moving closer or further from the steering wheel
         float targetSurgeZ = 0f;
-        if (currentSpeedKmH > 2f)
+        bool braking = vehicle.brakeInput > 0.1f;
+        bool clutching = vehicle.clutchInputRaw > 0.1f;
+        bool accelerating = vehicle.throttle > 0.1f;
+        bool isMoving = currentSpeedKmH > 2f;
+
+        if (isMoving)
         {
-            if (vehicle.brakeInput > 0.1f) targetSurgeZ = maxSurgeZ * vehicle.brakeInput; // Thrown forward into seatbelt
-            else if (vehicle.throttle > 0.1f) targetSurgeZ = -maxSurgeZ * 0.5f; // Sunk into seat
+            if (braking && !clutching) targetSurgeZ = maxSurgeZ;          // Hard Braking (Nose dive)
+            else if (braking && clutching) targetSurgeZ = 0.8f * maxSurgeZ; // Braking + Clutch
+            else if (!accelerating && !clutching) targetSurgeZ = 0.6f * maxSurgeZ; // Engine braking
+            else if (clutching && !braking) targetSurgeZ = 0.2f * maxSurgeZ; // Coasting/Neutral
+            else if (accelerating) targetSurgeZ = -maxSurgeZ * 0.5f * vehicle.throttle; // Sunk into seat
         }
 
         smoothedSurgeZ = Mathf.SmoothDamp(smoothedSurgeZ, targetSurgeZ, ref surgeVelocity, 0.12f);
