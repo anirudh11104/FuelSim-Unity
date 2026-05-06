@@ -10,13 +10,18 @@ public class MenuManager : MonoBehaviour
     public GameObject mainMenuPanel;
     public GameObject vehicleSelectPanel;
     public GameObject settingsPanel;
+    public GameObject tuningPanel;
     public GameObject pauseMenuPanel;
     public GameObject hudCanvas;
+
+    [Header("Tuning Elements")]
+    public GameObject tuningPlayButton;
 
     [Header("First Selected (For Gamepad)")]
     public GameObject mainPlayButton;
     public GameObject vehicleMotorcycleButton;
     public GameObject settingsFirstOption;
+    public GameObject tuningFirstOption;
     public GameObject pauseResumeButton;
 
     [Header("Vehicles")]
@@ -27,23 +32,19 @@ public class MenuManager : MonoBehaviour
     private bool inMainMenu = true;
     private float lastPauseTime = 0f;
 
-    // The invisible node that keeps the Input System awake
     private GameObject hiddenFocusNode;
 
     void Awake()
     {
-        // Creates an invisible, unclickable Canvas in the background
         hiddenFocusNode = new GameObject("Hidden_UI_Focus_Node");
         Canvas canvas = hiddenFocusNode.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
-        // Adds a button, but completely disables its ability to navigate
         Button dummyButton = hiddenFocusNode.AddComponent<Button>();
         Navigation nav = new Navigation();
         nav.mode = Navigation.Mode.None;
         dummyButton.navigation = nav;
 
-        // Makes it 100% invisible
         CanvasGroup cg = hiddenFocusNode.AddComponent<CanvasGroup>();
         cg.alpha = 0f;
         cg.blocksRaycasts = false;
@@ -56,7 +57,6 @@ public class MenuManager : MonoBehaviour
 
     void Update()
     {
-        // --- PAUSE LOGIC (Start Button) ---
         bool pauseInput = false;
         if (Gamepad.current != null && Gamepad.current.startButton.wasPressedThisFrame) pauseInput = true;
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) pauseInput = true;
@@ -72,7 +72,6 @@ public class MenuManager : MonoBehaviour
             }
         }
 
-        // --- BACK LOGIC ('B' Button) ---
         if (Gamepad.current != null && Gamepad.current.buttonEast.wasPressedThisFrame)
         {
             if (settingsPanel.activeSelf)
@@ -80,30 +79,30 @@ public class MenuManager : MonoBehaviour
                 if (inMainMenu) ShowMainMenu();
                 else PauseGame();
             }
+            else if (tuningPanel.activeSelf)
+            {
+                BackFromTuning();
+            }
             else if (vehicleSelectPanel.activeSelf) ShowMainMenu();
             else if (pauseMenuPanel.activeSelf) ResumeGame();
         }
 
-        // --- THE INSTANT WAKE-UP LOGIC ---
-        // If the invisible node is selected, wait for the absolute tiniest stick movement
         if (EventSystem.current.currentSelectedGameObject == hiddenFocusNode || EventSystem.current.currentSelectedGameObject == null)
         {
             if (Gamepad.current != null)
             {
-                // sqrMagnitude of 0.05 ignores stick drift but instantly catches a real thumb push
                 if (Gamepad.current.leftStick.ReadValue().sqrMagnitude > 0.05f ||
                     Gamepad.current.dpad.ReadValue().sqrMagnitude > 0.05f)
                 {
                     if (mainMenuPanel.activeSelf) SetSelected(mainPlayButton);
                     else if (vehicleSelectPanel.activeSelf) SetSelected(vehicleMotorcycleButton);
                     else if (settingsPanel.activeSelf) SetSelected(settingsFirstOption);
+                    else if (tuningPanel.activeSelf) SetSelected(tuningFirstOption);
                     else if (pauseMenuPanel.activeSelf) SetSelected(pauseResumeButton);
                 }
             }
         }
     }
-
-    // --- PANEL NAVIGATION ---
 
     public void ShowMainMenu()
     {
@@ -118,7 +117,6 @@ public class MenuManager : MonoBehaviour
         CloseAllPanels();
         mainMenuPanel.SetActive(true);
 
-        // THE FIX: Select the invisible node instead of null
         SetSelected(hiddenFocusNode);
         if (hudCanvas != null) hudCanvas.SetActive(false);
     }
@@ -137,28 +135,29 @@ public class MenuManager : MonoBehaviour
         SetSelected(hiddenFocusNode);
     }
 
+    public void ShowTuning()
+    {
+        CloseAllPanels();
+        tuningPanel.SetActive(true);
+
+        if (tuningPlayButton != null)
+        {
+            tuningPlayButton.SetActive(inMainMenu);
+        }
+
+        SetSelected(hiddenFocusNode);
+    }
+
     public void BackFromSettings()
     {
         if (inMainMenu) ShowMainMenu();
         else PauseGame();
     }
 
-    // --- GAMEPLAY STATE ---
-
-    public void PlayAsCar()
+    public void BackFromTuning()
     {
-        motorcyclePlayer.SetActive(false);
-        carPlayer.SetActive(true);
-        ActiveVehicle.Current = carPlayer;
-        StartGame();
-    }
-
-    public void PlayAsMotorcycle()
-    {
-        carPlayer.SetActive(false);
-        motorcyclePlayer.SetActive(true);
-        ActiveVehicle.Current = motorcyclePlayer;
-        StartGame();
+        if (inMainMenu) ShowVehicleSelect();
+        else PauseGame();
     }
 
     public void StartGame()
@@ -207,18 +206,22 @@ public class MenuManager : MonoBehaviour
         Application.Quit();
     }
 
-    // --- UTILS ---
-
     private void CloseAllPanels()
     {
         mainMenuPanel.SetActive(false);
         vehicleSelectPanel.SetActive(false);
         settingsPanel.SetActive(false);
+        tuningPanel.SetActive(false);
         pauseMenuPanel.SetActive(false);
     }
 
     private void SetSelected(GameObject firstButton)
     {
+        if (EventSystem.current == null) return;
+
+        // Anti-Spam Lock: If it's already selected, don't do anything!
+        if (EventSystem.current.currentSelectedGameObject == firstButton) return;
+
         EventSystem.current.SetSelectedGameObject(null);
         EventSystem.current.SetSelectedGameObject(firstButton);
 
