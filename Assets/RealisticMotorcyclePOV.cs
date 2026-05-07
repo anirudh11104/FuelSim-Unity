@@ -95,49 +95,40 @@ public class RealisticMotorcyclePOV : MonoBehaviour
         currentManualPitch = Mathf.Clamp(currentManualPitch, -maxLookPitch, maxLookPitch);
 
         // --- 3. SURGE & G-FORCE PITCH ---
-        // --- 2. G-FORCE PITCH (THE "FAKE IT" FIX) ---
-        // We decouple the camera pitch from the rigid body's physical speed.
-        // Instead, we calculate implied G-Force using smooth analog inputs. 
-        // This guarantees 0% vibration, even in 1st gear.
-
-        // These fake multipliers replace your physical gear ratios for the camera's feeling
         float[] gearGForce = { 0f, 15f, 10f, 7f, 4f, 2f };
         int safeGear = Mathf.Clamp(vehicle.currentGear, 0, 5);
 
-        // The torque fades out as the engine reaches redline, so the G-force should too
         float rpmFactor = Mathf.Clamp01(1f - (vehicle.rpm / vehicle.maxRPM));
-
-        // If the clutch is pulled, the engine is disconnected and provides zero G-force
         float clutchEngagement = 1f - vehicle.clutch;
 
-        // Calculate the smooth backward pitch
+        // 1. Un-square the brake math to get a perfect 0.0 to 1.0 linear trigger ratio
+        float linearBrakeRatio = Mathf.Sqrt(Mathf.Clamp01(vehicle.currentBrakeForce / vehicle.brakePower));
+
+        // 2. Acceleration Pitch
         float targetAccelPitch = -vehicle.throttle * gearGForce[safeGear] * rpmFactor * clutchEngagement * accelPitchMultiplier;
 
-        // Add the forward dive for braking
-        if (vehicle.currentBrakeForce > 10f)
+        // 3. Braking Dive (Scales proportionally with the trigger!)
+        if (linearBrakeRatio > 0.01f)
         {
-            // Calculate a multiplier from 0.0 to 1.0 based on how fast the bike is physically rolling
             float speedFactor = Mathf.Clamp01(vehicle.speed / 10f);
-
-            // Multiply the dive angle by the speed factor so it sits at 0 when parked
-            targetAccelPitch = 10f * speedFactor;
+            targetAccelPitch = 10f * speedFactor * linearBrakeRatio;
         }
 
         targetAccelPitch = Mathf.Clamp(targetAccelPitch, -maxAccelPitch, maxAccelPitch);
 
+        // 4. Z-Surge Update (Moving forward/back proportionally)
         float targetSurgeZ = 0f;
-        bool braking = vehicle.currentBrakeForce > 10f;
         bool clutching = vehicle.clutchInputRaw > 0.1f;
         bool accelerating = vehicle.throttle > 0.1f;
         bool isMoving = vehicle.speed > 2f;
 
         if (isMoving)
         {
-            if (braking && !clutching) targetSurgeZ = maxSurgeZ;
-            else if (braking && clutching) targetSurgeZ = 0.8f * maxSurgeZ;
-            else if (!accelerating && !clutching) targetSurgeZ = 0.6f * maxSurgeZ;
-            else if (clutching && !braking) targetSurgeZ = 0.2f * maxSurgeZ;
-            else if (accelerating) targetSurgeZ = -vehicle.throttle * maxSurgeZ * 0.6f;
+            if (linearBrakeRatio > 0.05f && !clutching) targetSurgeZ = maxSurgeZ * linearBrakeRatio; // Smooth forward surge!
+            else if (linearBrakeRatio > 0.05f && clutching) targetSurgeZ = 0.8f * maxSurgeZ * linearBrakeRatio; // Smooth forward surge!
+            else if (!accelerating && !clutching) targetSurgeZ = 0.6f * maxSurgeZ; // Engine braking
+            else if (clutching && linearBrakeRatio <= 0.05f) targetSurgeZ = 0.2f * maxSurgeZ; // Coasting
+            else if (accelerating) targetSurgeZ = -vehicle.throttle * maxSurgeZ * 0.6f; // Sink into seat
         }
 
         targetSurgeZ = Mathf.Clamp(targetSurgeZ, -maxSurgeZ, maxSurgeZ);
